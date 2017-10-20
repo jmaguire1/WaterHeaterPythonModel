@@ -48,7 +48,8 @@ class WaterHeater():
         Eloss = []
         outputfilename = "C:/Users/jmaguire/Desktop/elec_wh_notebooks/ElecWHOutput.csv"
         #outputfilename = "C:/Users/jmaguire/Desktop/elec_wh_notebooks/ElecWHOutput_hotdraw.csv"
-        outputfile = open(outputfilename, 'w')
+        outputfile = open((os.path.join(os.path.dirname(__file__),'ElecWHOutput.csv')),'w')
+                          
         outputfile.write('T_amb (F), RH_amb (%), Tmains (F), Draw Volume(gal), T_tank (F), E_consumed (Btu), E_delivered (Btu), E_tankloss (Btu) \n')
         
         #Perform minutely calculations
