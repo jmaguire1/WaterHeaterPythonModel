@@ -1,0 +1,24 @@
+Program Version,EnergyPlus, Version 8.7.0-78a111df4a, YMD=2017.10.20 09:44,IDD_Version 8.7.0
+   ** Warning ** For Schedule:File="SHOWERS", Blank Schedule Type Limits Name input -- will not be validated.
+   ** Warning ** For Schedule:File="SINKS", Blank Schedule Type Limits Name input -- will not be validated.
+   ** Warning ** For Schedule:File="BATHS", Blank Schedule Type Limits Name input -- will not be validated.
+   ** Warning ** For Schedule:File="CLOTHESWASHER", Blank Schedule Type Limits Name input -- will not be validated.
+   ** Warning ** For Schedule:File="DISHWASHER", Blank Schedule Type Limits Name input -- will not be validated.
+   ** Warning ** WaterHeater:Mixed = TEST50GALWH:  Use side nodes are specified; Cold Water Supply Temperature Schedule will not be used
+   ** Warning ** Check input. Pump nominal power or motor efficiency is set to 0, for pump=MAINS PRESSURE
+   ************* Testing Individual Branch Integrity
+   ************* All Branches passed integrity testing
+   ************* Testing Individual Supply Air Path Integrity
+   ************* All Supply Air Paths passed integrity testing
+   ************* Testing Individual Return Air Path Integrity
+   ************* All Return Air Paths passed integrity testing
+   ************* No node connection errors were found.
+   ************* Beginning Simulation
+   ************* Simulation Error Summary *************
+   ************* There are 1 unused schedules in input.
+   ************* There are 1 unused week schedules in input.
+   ************* There are 1 unused day schedules in input.
+   ************* Use Output:Diagnostics,DisplayUnusedSchedules; to see them.
+   ************* EnergyPlus Warmup Error Summary. During Warmup: 0 Warning; 0 Severe Errors.
+   ************* EnergyPlus Sizing Error Summary. During Sizing: 0 Warning; 0 Severe Errors.
+   ************* EnergyPlus Completed Successfully-- 7 Warning; 0 Severe Errors; Elapsed Time=00hr 00min 29.50sec

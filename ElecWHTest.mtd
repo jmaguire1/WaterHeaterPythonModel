@@ -1,0 +1,336 @@
+
+ Meters for 6,SHOWER_HW:Water Use Equipment Total Volume [m3]
+  OnMeter=Water:Facility [m3]
+  OnMeter=Water:Plant [m3]
+  OnMeter=WaterSystems:Water [m3]
+  OnMeter=General:WaterSystems:Water [m3]
+
+ Meters for 47,SHOWER_HW:Water Use Equipment Mains Water Volume [m3]
+  OnMeter=MainsWater:Facility [m3]
+  OnMeter=MainsWater:Plant [m3]
+  OnMeter=WaterSystems:MainsWater [m3]
+  OnMeter=General:WaterSystems:MainsWater [m3]
+
+ Meters for 88,SHOWER_HW:Water Use Equipment Heating Energy [J]
+  OnMeter=EnergyTransfer:Facility [J]
+  OnMeter=EnergyTransfer:Plant [J]
+  OnMeter=WaterSystems:EnergyTransfer [J]
+  OnMeter=General:WaterSystems:EnergyTransfer [J]
+
+ Meters for 129,SINKS_HW:Water Use Equipment Total Volume [m3]
+  OnMeter=Water:Facility [m3]
+  OnMeter=Water:Plant [m3]
+  OnMeter=WaterSystems:Water [m3]
+  OnMeter=General:WaterSystems:Water [m3]
+
+ Meters for 130,SINKS_HW:Water Use Equipment Mains Water Volume [m3]
+  OnMeter=MainsWater:Facility [m3]
+  OnMeter=MainsWater:Plant [m3]
+  OnMeter=WaterSystems:MainsWater [m3]
+  OnMeter=General:WaterSystems:MainsWater [m3]
+
+ Meters for 131,SINKS_HW:Water Use Equipment Heating Energy [J]
+  OnMeter=EnergyTransfer:Facility [J]
+  OnMeter=EnergyTransfer:Plant [J]
+  OnMeter=WaterSystems:EnergyTransfer [J]
+  OnMeter=General:WaterSystems:EnergyTransfer [J]
+
+ Meters for 132,BATHS_HW:Water Use Equipment Total Volume [m3]
+  OnMeter=Water:Facility [m3]
+  OnMeter=Water:Plant [m3]
+  OnMeter=WaterSystems:Water [m3]
+  OnMeter=General:WaterSystems:Water [m3]
+
+ Meters for 133,BATHS_HW:Water Use Equipment Mains Water Volume [m3]
+  OnMeter=MainsWater:Facility [m3]
+  OnMeter=MainsWater:Plant [m3]
+  OnMeter=WaterSystems:MainsWater [m3]
+  OnMeter=General:WaterSystems:MainsWater [m3]
+
+ Meters for 134,BATHS_HW:Water Use Equipment Heating Energy [J]
+  OnMeter=EnergyTransfer:Facility [J]
+  OnMeter=EnergyTransfer:Plant [J]
+  OnMeter=WaterSystems:EnergyTransfer [J]
+  OnMeter=General:WaterSystems:EnergyTransfer [J]
+
+ Meters for 135,CLOTHESWASHER_HW:Water Use Equipment Total Volume [m3]
+  OnMeter=Water:Facility [m3]
+  OnMeter=Water:Plant [m3]
+  OnMeter=WaterSystems:Water [m3]
+  OnMeter=General:WaterSystems:Water [m3]
+
+ Meters for 136,CLOTHESWASHER_HW:Water Use Equipment Mains Water Volume [m3]
+  OnMeter=MainsWater:Facility [m3]
+  OnMeter=MainsWater:Plant [m3]
+  OnMeter=WaterSystems:MainsWater [m3]
+  OnMeter=General:WaterSystems:MainsWater [m3]
+
+ Meters for 137,CLOTHESWASHER_HW:Water Use Equipment Heating Energy [J]
+  OnMeter=EnergyTransfer:Facility [J]
+  OnMeter=EnergyTransfer:Plant [J]
+  OnMeter=WaterSystems:EnergyTransfer [J]
+  OnMeter=General:WaterSystems:EnergyTransfer [J]
+
+ Meters for 138,DISHWASHER_HW:Water Use Equipment Total Volume [m3]
+  OnMeter=Water:Facility [m3]
+  OnMeter=Water:Plant [m3]
+  OnMeter=WaterSystems:Water [m3]
+  OnMeter=General:WaterSystems:Water [m3]
+
+ Meters for 139,DISHWASHER_HW:Water Use Equipment Mains Water Volume [m3]
+  OnMeter=MainsWater:Facility [m3]
+  OnMeter=MainsWater:Plant [m3]
+  OnMeter=WaterSystems:MainsWater [m3]
+  OnMeter=General:WaterSystems:MainsWater [m3]
+
+ Meters for 140,DISHWASHER_HW:Water Use Equipment Heating Energy [J]
+  OnMeter=EnergyTransfer:Facility [J]
+  OnMeter=EnergyTransfer:Plant [J]
+  OnMeter=WaterSystems:EnergyTransfer [J]
+  OnMeter=General:WaterSystems:EnergyTransfer [J]
+
+ Meters for 141,DOMESTIC HOT WATER:Water Use Connections Plant Hot Water Energy [J]
+  OnMeter=PlantLoopHeatingDemand:Facility [J]
+  OnMeter=PlantLoopHeatingDemand:Plant [J]
+  OnMeter=WaterSystems:PlantLoopHeatingDemand [J]
+
+ Meters for 177,TEST50GALWH:Water Heater Source Side Heat Transfer Energy [J]
+  OnMeter=PlantLoopHeatingDemand:Facility [J]
+  OnMeter=PlantLoopHeatingDemand:Plant [J]
+  OnMeter=WaterSystems:PlantLoopHeatingDemand [J]
+  OnMeter=Water Heater:WaterSystems:PlantLoopHeatingDemand [J]
+
+ Meters for 189,TEST50GALWH:Water Heater Electric Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Plant [J]
+  OnMeter=WaterSystems:Electricity [J]
+  OnMeter=Water Heater:WaterSystems:Electricity [J]
+
+ Meters for 230,TEST50GALWH:Water Heater Off Cycle Parasitic Electric Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Plant [J]
+  OnMeter=WaterSystems:Electricity [J]
+  OnMeter=Water Heater:WaterSystems:Electricity [J]
+
+ Meters for 231,TEST50GALWH:Water Heater On Cycle Parasitic Electric Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Plant [J]
+  OnMeter=WaterSystems:Electricity [J]
+  OnMeter=Water Heater:WaterSystems:Electricity [J]
+
+ Meters for 232,TEST50GALWH:Water Heater Water Volume [m3]
+  OnMeter=Water:Facility [m3]
+  OnMeter=Water:Plant [m3]
+  OnMeter=WaterSystems:Water [m3]
+  OnMeter=Water Heater:WaterSystems:Water [m3]
+
+ Meters for 243,TEST50GALWH:Water Heater Mains Water Volume [m3]
+  OnMeter=MainsWater:Facility [m3]
+  OnMeter=MainsWater:Plant [m3]
+  OnMeter=WaterSystems:MainsWater [m3]
+  OnMeter=Water Heater:WaterSystems:MainsWater [m3]
+
+ Meters for 254,Whole Building:Facility Total Purchased Electric Energy [J]
+  OnMeter=ElectricityPurchased:Facility [J]
+  OnMeter=ElectricityPurchased:Plant [J]
+  OnMeter=Cogeneration:ElectricityPurchased [J]
+
+ Meters for 285,Whole Building:Facility Total Surplus Electric Energy [J]
+  OnMeter=ElectricitySurplusSold:Facility [J]
+  OnMeter=ElectricitySurplusSold:Plant [J]
+  OnMeter=Cogeneration:ElectricitySurplusSold [J]
+
+ Meters for 316,Whole Building:Facility Net Purchased Electric Energy [J]
+  OnMeter=ElectricityNet:Facility [J]
+  OnMeter=ElectricityNet:Plant [J]
+  OnMeter=Cogeneration:ElectricityNet [J]
+
+ Meters for 347,MAINS PRESSURE:Pump Electric Energy [J]
+  OnMeter=Electricity:Facility [J]
+  OnMeter=Electricity:Plant [J]
+  OnMeter=Pumps:Electricity [J]
+
+ Meters for 358,Site:Environmental Impact Total N2O Emissions Carbon Equivalent Mass [kg]
+  OnMeter=Carbon Equivalent:Facility [kg]
+  OnMeter=CarbonEquivalentEmissions:Carbon Equivalent [kg]
+
+ Meters for 379,Site:Environmental Impact Total CH4 Emissions Carbon Equivalent Mass [kg]
+  OnMeter=Carbon Equivalent:Facility [kg]
+  OnMeter=CarbonEquivalentEmissions:Carbon Equivalent [kg]
+
+ Meters for 380,Site:Environmental Impact Total CO2 Emissions Carbon Equivalent Mass [kg]
+  OnMeter=Carbon Equivalent:Facility [kg]
+  OnMeter=CarbonEquivalentEmissions:Carbon Equivalent [kg]
+
+ For Meter=Water:Facility [m3], ResourceType=Water, contents are:
+  SHOWER_HW:Water Use Equipment Total Volume
+  SINKS_HW:Water Use Equipment Total Volume
+  BATHS_HW:Water Use Equipment Total Volume
+  CLOTHESWASHER_HW:Water Use Equipment Total Volume
+  DISHWASHER_HW:Water Use Equipment Total Volume
+  TEST50GALWH:Water Heater Water Volume
+
+ For Meter=Water:Plant [m3], ResourceType=Water, Group=Plant, contents are:
+  SHOWER_HW:Water Use Equipment Total Volume
+  SINKS_HW:Water Use Equipment Total Volume
+  BATHS_HW:Water Use Equipment Total Volume
+  CLOTHESWASHER_HW:Water Use Equipment Total Volume
+  DISHWASHER_HW:Water Use Equipment Total Volume
+  TEST50GALWH:Water Heater Water Volume
+
+ For Meter=WaterSystems:Water [m3], ResourceType=Water, EndUse=WaterSystems, contents are:
+  SHOWER_HW:Water Use Equipment Total Volume
+  SINKS_HW:Water Use Equipment Total Volume
+  BATHS_HW:Water Use Equipment Total Volume
+  CLOTHESWASHER_HW:Water Use Equipment Total Volume
+  DISHWASHER_HW:Water Use Equipment Total Volume
+  TEST50GALWH:Water Heater Water Volume
+
+ For Meter=General:WaterSystems:Water [m3], ResourceType=Water, EndUse=WaterSystems, contents are:
+  SHOWER_HW:Water Use Equipment Total Volume
+  SINKS_HW:Water Use Equipment Total Volume
+  BATHS_HW:Water Use Equipment Total Volume
+  CLOTHESWASHER_HW:Water Use Equipment Total Volume
+  DISHWASHER_HW:Water Use Equipment Total Volume
+
+ For Meter=MainsWater:Facility [m3], ResourceType=MainsWater, contents are:
+  SHOWER_HW:Water Use Equipment Mains Water Volume
+  SINKS_HW:Water Use Equipment Mains Water Volume
+  BATHS_HW:Water Use Equipment Mains Water Volume
+  CLOTHESWASHER_HW:Water Use Equipment Mains Water Volume
+  DISHWASHER_HW:Water Use Equipment Mains Water Volume
+  TEST50GALWH:Water Heater Mains Water Volume
+
+ For Meter=MainsWater:Plant [m3], ResourceType=MainsWater, Group=Plant, contents are:
+  SHOWER_HW:Water Use Equipment Mains Water Volume
+  SINKS_HW:Water Use Equipment Mains Water Volume
+  BATHS_HW:Water Use Equipment Mains Water Volume
+  CLOTHESWASHER_HW:Water Use Equipment Mains Water Volume
+  DISHWASHER_HW:Water Use Equipment Mains Water Volume
+  TEST50GALWH:Water Heater Mains Water Volume
+
+ For Meter=WaterSystems:MainsWater [m3], ResourceType=MainsWater, EndUse=WaterSystems, contents are:
+  SHOWER_HW:Water Use Equipment Mains Water Volume
+  SINKS_HW:Water Use Equipment Mains Water Volume
+  BATHS_HW:Water Use Equipment Mains Water Volume
+  CLOTHESWASHER_HW:Water Use Equipment Mains Water Volume
+  DISHWASHER_HW:Water Use Equipment Mains Water Volume
+  TEST50GALWH:Water Heater Mains Water Volume
+
+ For Meter=General:WaterSystems:MainsWater [m3], ResourceType=MainsWater, EndUse=WaterSystems, contents are:
+  SHOWER_HW:Water Use Equipment Mains Water Volume
+  SINKS_HW:Water Use Equipment Mains Water Volume
+  BATHS_HW:Water Use Equipment Mains Water Volume
+  CLOTHESWASHER_HW:Water Use Equipment Mains Water Volume
+  DISHWASHER_HW:Water Use Equipment Mains Water Volume
+
+ For Meter=EnergyTransfer:Facility [J], ResourceType=EnergyTransfer, contents are:
+  SHOWER_HW:Water Use Equipment Heating Energy
+  SINKS_HW:Water Use Equipment Heating Energy
+  BATHS_HW:Water Use Equipment Heating Energy
+  CLOTHESWASHER_HW:Water Use Equipment Heating Energy
+  DISHWASHER_HW:Water Use Equipment Heating Energy
+
+ For Meter=EnergyTransfer:Plant [J], ResourceType=EnergyTransfer, Group=Plant, contents are:
+  SHOWER_HW:Water Use Equipment Heating Energy
+  SINKS_HW:Water Use Equipment Heating Energy
+  BATHS_HW:Water Use Equipment Heating Energy
+  CLOTHESWASHER_HW:Water Use Equipment Heating Energy
+  DISHWASHER_HW:Water Use Equipment Heating Energy
+
+ For Meter=WaterSystems:EnergyTransfer [J], ResourceType=EnergyTransfer, EndUse=WaterSystems, contents are:
+  SHOWER_HW:Water Use Equipment Heating Energy
+  SINKS_HW:Water Use Equipment Heating Energy
+  BATHS_HW:Water Use Equipment Heating Energy
+  CLOTHESWASHER_HW:Water Use Equipment Heating Energy
+  DISHWASHER_HW:Water Use Equipment Heating Energy
+
+ For Meter=General:WaterSystems:EnergyTransfer [J], ResourceType=EnergyTransfer, EndUse=WaterSystems, contents are:
+  SHOWER_HW:Water Use Equipment Heating Energy
+  SINKS_HW:Water Use Equipment Heating Energy
+  BATHS_HW:Water Use Equipment Heating Energy
+  CLOTHESWASHER_HW:Water Use Equipment Heating Energy
+  DISHWASHER_HW:Water Use Equipment Heating Energy
+
+ For Meter=PlantLoopHeatingDemand:Facility [J], ResourceType=PlantLoopHeatingDemand, contents are:
+  DOMESTIC HOT WATER:Water Use Connections Plant Hot Water Energy
+  TEST50GALWH:Water Heater Source Side Heat Transfer Energy
+
+ For Meter=PlantLoopHeatingDemand:Plant [J], ResourceType=PlantLoopHeatingDemand, Group=Plant, contents are:
+  DOMESTIC HOT WATER:Water Use Connections Plant Hot Water Energy
+  TEST50GALWH:Water Heater Source Side Heat Transfer Energy
+
+ For Meter=WaterSystems:PlantLoopHeatingDemand [J], ResourceType=PlantLoopHeatingDemand, EndUse=WaterSystems, contents are:
+  DOMESTIC HOT WATER:Water Use Connections Plant Hot Water Energy
+  TEST50GALWH:Water Heater Source Side Heat Transfer Energy
+
+ For Meter=Water Heater:WaterSystems:PlantLoopHeatingDemand [J], ResourceType=PlantLoopHeatingDemand, EndUse=WaterSystems, contents are:
+  TEST50GALWH:Water Heater Source Side Heat Transfer Energy
+
+ For Meter=Electricity:Facility [J], ResourceType=Electricity, contents are:
+  TEST50GALWH:Water Heater Electric Energy
+  TEST50GALWH:Water Heater Off Cycle Parasitic Electric Energy
+  TEST50GALWH:Water Heater On Cycle Parasitic Electric Energy
+  MAINS PRESSURE:Pump Electric Energy
+
+ For Meter=Electricity:Plant [J], ResourceType=Electricity, Group=Plant, contents are:
+  TEST50GALWH:Water Heater Electric Energy
+  TEST50GALWH:Water Heater Off Cycle Parasitic Electric Energy
+  TEST50GALWH:Water Heater On Cycle Parasitic Electric Energy
+  MAINS PRESSURE:Pump Electric Energy
+
+ For Meter=WaterSystems:Electricity [J], ResourceType=Electricity, EndUse=WaterSystems, contents are:
+  TEST50GALWH:Water Heater Electric Energy
+  TEST50GALWH:Water Heater Off Cycle Parasitic Electric Energy
+  TEST50GALWH:Water Heater On Cycle Parasitic Electric Energy
+
+ For Meter=Water Heater:WaterSystems:Electricity [J], ResourceType=Electricity, EndUse=WaterSystems, contents are:
+  TEST50GALWH:Water Heater Electric Energy
+  TEST50GALWH:Water Heater Off Cycle Parasitic Electric Energy
+  TEST50GALWH:Water Heater On Cycle Parasitic Electric Energy
+
+ For Meter=Water Heater:WaterSystems:Water [m3], ResourceType=Water, EndUse=WaterSystems, contents are:
+  TEST50GALWH:Water Heater Water Volume
+
+ For Meter=Water Heater:WaterSystems:MainsWater [m3], ResourceType=MainsWater, EndUse=WaterSystems, contents are:
+  TEST50GALWH:Water Heater Mains Water Volume
+
+ For Meter=ElectricityPurchased:Facility [J], ResourceType=ElectricityPurchased, contents are:
+  Whole Building:Facility Total Purchased Electric Energy
+
+ For Meter=ElectricityPurchased:Plant [J], ResourceType=ElectricityPurchased, Group=Plant, contents are:
+  Whole Building:Facility Total Purchased Electric Energy
+
+ For Meter=Cogeneration:ElectricityPurchased [J], ResourceType=ElectricityPurchased, EndUse=Cogeneration, contents are:
+  Whole Building:Facility Total Purchased Electric Energy
+
+ For Meter=ElectricitySurplusSold:Facility [J], ResourceType=ElectricitySurplusSold, contents are:
+  Whole Building:Facility Total Surplus Electric Energy
+
+ For Meter=ElectricitySurplusSold:Plant [J], ResourceType=ElectricitySurplusSold, Group=Plant, contents are:
+  Whole Building:Facility Total Surplus Electric Energy
+
+ For Meter=Cogeneration:ElectricitySurplusSold [J], ResourceType=ElectricitySurplusSold, EndUse=Cogeneration, contents are:
+  Whole Building:Facility Total Surplus Electric Energy
+
+ For Meter=ElectricityNet:Facility [J], ResourceType=ElectricityNet, contents are:
+  Whole Building:Facility Net Purchased Electric Energy
+
+ For Meter=ElectricityNet:Plant [J], ResourceType=ElectricityNet, Group=Plant, contents are:
+  Whole Building:Facility Net Purchased Electric Energy
+
+ For Meter=Cogeneration:ElectricityNet [J], ResourceType=ElectricityNet, EndUse=Cogeneration, contents are:
+  Whole Building:Facility Net Purchased Electric Energy
+
+ For Meter=Pumps:Electricity [J], ResourceType=Electricity, EndUse=Pumps, contents are:
+  MAINS PRESSURE:Pump Electric Energy
+
+ For Meter=Carbon Equivalent:Facility [kg], ResourceType=Carbon Equivalent, contents are:
+  Site:Environmental Impact Total N2O Emissions Carbon Equivalent Mass
+  Site:Environmental Impact Total CH4 Emissions Carbon Equivalent Mass
+  Site:Environmental Impact Total CO2 Emissions Carbon Equivalent Mass
+
+ For Meter=CarbonEquivalentEmissions:Carbon Equivalent [kg], ResourceType=Carbon Equivalent, EndUse=CarbonEquivalentEmissions, contents are:
+  Site:Environmental Impact Total N2O Emissions Carbon Equivalent Mass
+  Site:Environmental Impact Total CH4 Emissions Carbon Equivalent Mass
+  Site:Environmental Impact Total CO2 Emissions Carbon Equivalent Mass

@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<svg width="250mm" height="200mm" viewBox="0 0   2750    1500"
+     xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     xmlns:ev="http://www.w3.org/2001/xml-events">
+<g font-family="Verdana" font-size="8" >
+  <rect x="  1200" y="    20" width="   200" height="    20" style = "fill:wheat; stroke: Black;"/>     2
+  <text x="  1202" y="    33">DHW SUPPLY OUTLET PIPE</text>
+  <rect x="  1450" y="    20" width="   200" height="    20" style = "fill:wheat; stroke: Black;"/>     3
+  <text x="  1452" y="    33">DHW DEMAND INLET PIPE</text>
+  <rect x="  2450" y="    20" width="   200" height="    20" style = "fill:wheat; stroke: Black;"/>     4
+  <text x="  2452" y="    33">MAINS MAKEUP PIPE</text>
+  <rect x="  1700" y="    20" width="   200" height="    20" style = "fill:wheat; stroke: Black;"/>     5
+  <text x="  1702" y="    33">DHW DEMAND SPLITTER</text>
+  <rect x="  2200" y="    20" width="   200" height="    20" style = "fill:wheat; stroke: Black;"/>     6
+  <text x="  2202" y="    33">DHW DEMAND MIXER</text>
+  <rect x="   450" y="    20" width="   200" height="    20" style = "fill:wheat; stroke: Black;"/>     7
+  <text x="   452" y="    33">DHW SUPPLY SPLITTER</text>
+  <rect x="   950" y="    20" width="   200" height="    20" style = "fill:wheat; stroke: Black;"/>     8
+  <text x="   952" y="    33">DHW SUPPLY MIXER</text>
+  <rect x="  1950" y="    20" width="   200" height="    20" style = "fill:wheat; stroke: Black;"/>     9
+  <text x="  1952" y="    33">DOMESTIC HOT WATER</text>
+  <rect x="   700" y="    20" width="   200" height="    20" style = "fill:orange; stroke: Black;"/>    10
+  <text x="   702" y="    33">TEST50GALWH</text>
+  <rect x="   200" y="    20" width="   200" height="    20" style = "fill:springgreen; stroke: Black;"/>    11
+  <text x="   202" y="    33">MAINS PRESSURE</text>
+  <line x1="  1400" y1="    30" x2="  1450" y2="    30" style = "stroke: Black;"/>
+  <line x1="  1650" y1="    30" x2="  1700" y2="    30" style = "stroke: Black;"/>
+  <line x1="  1900" y1="    30" x2="  1950" y2="    30" style = "stroke: Black;"/>
+  <line x1="  2400" y1="    30" x2="  2450" y2="    30" style = "stroke: Black;"/>
+  <line x1="   650" y1="    30" x2="   700" y2="    30" style = "stroke: Black;"/>
+  <line x1="  1150" y1="    30" x2="  1200" y2="    30" style = "stroke: Black;"/>
+  <line x1="  2150" y1="    30" x2="  2200" y2="    30" style = "stroke: Black;"/>
+  <line x1="   900" y1="    30" x2="   950" y2="    30" style = "stroke: Black;"/>
+  <line x1="   400" y1="    30" x2="   450" y2="    30" style = "stroke: Black;"/>
+  <line x1="   200" y1="    30" x2="   175" y2="    30" style = "stroke: Black;"/>
+  <line x1="   175" y1="    30" x2="   175" y2="     0" style = "stroke: Black;"/>
+  <line x1="   175" y1="     0" x2="  2675" y2="     0" style = "stroke: Black;"/>
+  <line x1="  2675" y1="     0" x2="  2675" y2="    30" style = "stroke: Black;"/>
+  <line x1="  2675" y1="    30" x2="  2650" y2="    30" style = "stroke: Black;"/>
+  <text x="   200" y="    80">Unused Non-Parent Objects:</text>
+  <text x="   220" y="   100">DHW LOOP SETPOINT MANAGER_1</text>
+  <text x="   200" y="   140">
+The following are not supported: objects related to controls, AirTerminal:SingleDuct:Uncontrolled, or ZoneHVAC:IdealLoadsAirSystem</text>
+</g>
+</svg>
