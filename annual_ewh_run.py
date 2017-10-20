@@ -46,8 +46,6 @@ class WaterHeater():
         Econs = []
         Edel = []
         Eloss = []
-        outputfilename = "C:/Users/jmaguire/Desktop/elec_wh_notebooks/ElecWHOutput.csv"
-        #outputfilename = "C:/Users/jmaguire/Desktop/elec_wh_notebooks/ElecWHOutput_hotdraw.csv"
         outputfile = open((os.path.join(os.path.dirname(__file__),'ElecWHOutput.csv')),'w')
                           
         outputfile.write('T_amb (F), RH_amb (%), Tmains (F), Draw Volume(gal), T_tank (F), E_consumed (Btu), E_delivered (Btu), E_tankloss (Btu) \n')
@@ -88,7 +86,7 @@ class WaterHeater():
         Tamb = []
         RHamb = []
         linenum = 0
-        ambient_cond_file = open((os.path.join(os.path.dirname(__file__),'data_files','ambient.csv')),'rb') #hourly ambient air temperature and RH
+        ambient_cond_file = open((os.path.join(os.path.dirname(__file__),'data_files','ambient.csv')),'r') #hourly ambient air temperature and RH
         for line in ambient_cond_file:
             if linenum > 0: #skip header
                 items = line.strip().split(',')
@@ -99,7 +97,7 @@ class WaterHeater():
         
         linenum = 0
         Tmains = []
-        mains_temp_file = open((os.path.join(os.path.dirname(__file__),'data_files','tmains.csv')),'rb') #hourly inlet water temperature
+        mains_temp_file = open((os.path.join(os.path.dirname(__file__),'data_files','tmains.csv')),'r') #hourly inlet water temperature
         for line in mains_temp_file:
             if linenum > 0:
                 items = line.strip().split(',')
@@ -110,7 +108,7 @@ class WaterHeater():
         linenum = 0
         hot_draw = []
         mixed_draw = []
-        draw_profile_file = open((os.path.join(os.path.dirname(__file__),'data_files','draw.csv')),'rb') #minutely draw profile (shower, sink, CW, DW, bath)
+        draw_profile_file = open((os.path.join(os.path.dirname(__file__),'data_files','draw.csv')),'r') #minutely draw profile (shower, sink, CW, DW, bath)
         for line in draw_profile_file:
             if linenum > 0:
                 items = line.strip().split(',')
