@@ -1,4 +1,3 @@
-# WaterHeaterPythonModel
 Water Heater Python Model
 ===============
 
@@ -6,7 +5,6 @@ This project includes an electric water heater model in Python. This model is ba
 
 ## Table of Contents
 
-* [Directory Layout] (#directory-layout)
 * [Running the Water Heater](#running-the-model)
 * [TODOs](#todo)
 * [Development](#development)
@@ -24,6 +22,6 @@ This will apply the measures to the OpenStudio seed model specified in the .osw,
 
 ## TODOs
 
-* [Draw Profile] - For mixed flows, iterate and use the current water heater temperature rather than last timestep's temperature
-* [Validation] - Get a better match on water heater consumed and delivered energy consumption to EnergyPlus (currently 10% difference)
-* [Multinode model] - Allow the model to work for n nodes (12 is pretty typical for a stratified tank). We'll also need to add master/slave element controls.
+* Draw Profile - For mixed flows, iterate and use the current water heater temperature rather than last timestep's temperature
+* Validation - Get a better match on water heater consumed and delivered energy consumption to EnergyPlus (currently 10% difference)
+* Multinode model - Allow the model to work for n nodes (12 is pretty typical for a stratified tank). We'll also need to add master/slave element controls.
