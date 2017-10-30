@@ -1,4 +1,4 @@
-Program Version,EnergyPlus, Version 8.7.0-78a111df4a, YMD=2017.10.18 16:41
+Program Version,EnergyPlus, Version 8.7.0-78a111df4a, YMD=2017.10.30 15:45
 ! <Version>, Version ID
  Version, 8.7
 ! <Timesteps per Hour>, #TimeSteps, Minutes per TimeStep {minutes}
@@ -67,7 +67,7 @@ Zone Volume Capacitance Multiplier,   1.000 ,   1.000,   1.000,   1.000
 ! <Water Heater Information>,Type,Name,Volume {m3},Maximum Capacity {W},Standard Rated Recovery Efficiency, Standard Rated Energy Factor
 Water Heater Information,WaterHeater:Mixed,TEST50GALWH,0.1703,4500.0,1.110,1.0990
 ! <Component Sizing Information>, Component Type, Component Name, Input Field Description, Value
- Component Sizing Information, WaterHeater:Mixed, TEST50GALWH, Use Side Design Flow Rate [m3/s], 3.15450E-004
+ Component Sizing Information, WaterHeater:Mixed, TEST50GALWH, Use Side Design Flow Rate [m3/s], 3.12296E-004
 ! <Environment>,Environment Name,Environment Type, Start Date, End Date, Start DayOfWeek, Duration {#days}, Source:Start DayOfWeek,  Use Daylight Saving, Use Holidays, Apply Weekend Holiday Rule,  Use Rain Values, Use Snow Values
 ! <Environment:Special Days>, Special Day Name, Special Day Type, Source, Start Date, Duration {#days}
 ! <Environment:Daylight Saving>, Daylight Saving Indicator, Source, Start Date, End Date

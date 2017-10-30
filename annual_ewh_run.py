@@ -6,6 +6,7 @@ import math
 from math import pi
 import matplotlib.pyplot as plt
 import time
+import numpy
 import basic_water_heater
 
 class WaterHeater():
@@ -24,9 +25,13 @@ class WaterHeater():
         #preserving these voltage things from GridLAB-D in case this model ever makes it back into there
         self.actual_voltage = 240.0 #V
         self.nominal_voltage = 240.0 #V
+        self.climate_location = 'denver' #TODO: is location a climate zone, 
+        self.installation_location = 'living' #Options are living, unfinished basement, garage, or attic 
+        #TODO: should we allow other location installations (finished basement, crawlspaces, outside?)
+        (Tamb, RHamb, Tmains, hot_draw, mixed_draw) = self.get_annual_conditions()
         
         #Load ambient conditions from files
-        (Tamb, RHamb, Tmains, hot_draw, mixed_draw) = self.get_annual_conditions()
+        
         
         #calculate water heater properties
         EF = 0.91 #Energy Factor
@@ -51,14 +56,16 @@ class WaterHeater():
         outputfile.write('T_amb (F), RH_amb (%), Tmains (F), Draw Volume(gal), T_tank (F), E_consumed (Btu), E_delivered (Btu), E_tankloss (Btu) \n')
         
         #Perform minutely calculations
-        for hour in range(8760):#8760 is 1 year
+        days_run = 365
+        hours_run = 24 * days_run
+        for hour in range(hours_run):#8760 is 1 year, 744 is January, 168 is 1 week, 24 is 1 day
             T_amb_ts = float(Tamb[hour])
             RH_amb_ts = float(RHamb[hour])
             Tmains_ts = float(Tmains[hour])
             for min in range(60):
                 draw_ts = (60 * hour + min)
-                draw = hot_draw[draw_ts] + mixed_draw[draw_ts] * ((Tmixed - Tmains_ts) / (Tlast - Tmains_ts)) #draw volume in gal
-                #draw = hot_draw[draw_ts] + mixed_draw[draw_ts] #draw volume in gal, only draw hot water
+                #draw = hot_draw[draw_ts] + mixed_draw[draw_ts] * ((Tmixed - Tmains_ts) / (Tlast - Tmains_ts)) #draw volume in gal
+                draw = hot_draw[draw_ts] + mixed_draw[draw_ts] #draw volume in gal, only draw hot water
                 (Ttank_ts,Econs_ts) = self.execute(Tlast,T_amb_ts,Tmains_ts,draw,draw_ts)
                 Ttank.append(Ttank_ts)
                 Vdraw.append(draw)
@@ -69,8 +76,9 @@ class WaterHeater():
                 Eloss.append(Eloss_ts)
                 outputfile.write(str(T_amb_ts) + ',' + str(RH_amb_ts) + ',' + str(Tmains_ts) + ',' + str(draw) + ',' + str(Ttank_ts) + ',' + str(Econs_ts) + ',' + str(Edel_ts) + ',' + str(Eloss_ts) + '\n')
                 Tlast = Ttank_ts
-                
-            
+        
+        print('Runs complete! Ran {} days.'.format(days_run))
+
         #fig=plt.figure()
         #ax=plt.subplot(111)
         #ax.plot(Ttank_ts)
@@ -85,7 +93,37 @@ class WaterHeater():
         #TODO: Use a .epw weather file? We'll eventually need atmospheric pressure (for psych calcs), could also estimate unconditioned space temp/rh based on ambient or calc mains directly based on weather file info
         Tamb = []
         RHamb = []
+        Tmains = []
+        if self.climate_location != 'denver':
+            raise NameError("Error! Only allowing Denver as a run location for now. Eventually we'll allow different locations and load different files based on the location.")
+        if self.installation_location == 'living':
+            amb_temp_column = 1
+            amb_rh_column = 2
+        elif self.installation_location == 'unfinished basement':
+            amb_temp_column = 3
+            amb_rh_column = 4
+        elif self.installation_location == 'garage':
+            amb_temp_column = 5
+            amb_rh_column = 6
+        elif self.installation_location == 'unifinished attic':
+            amb_temp_column = 7
+            amb_rh_column = 8
+        else:
+            raise NameError("Error! Only allowed installation locations are living, unfinished basement, garage, unfinished attic. Change the installation location to a valid location")
+        mains_temp_column = 9
+        
         linenum = 0
+        '''
+        ambient_cond_file = open((os.path.join(os.path.dirname(__file__),'data_files','denver_conditions.csv')),'r') #hourly ambient air temperature and RH
+        for line in ambient_cond_file:
+            if linenum > 0: #skip header
+                items = line.strip().split(',')
+                Tamb.append(float(items[amb_temp_column]))
+                RHamb.append(float(items[amb_rh_column]))
+                Tmains.append(float(items[mains_temp_column]))
+            linenum += 1
+        ambient_cond_file.close()
+        '''
         ambient_cond_file = open((os.path.join(os.path.dirname(__file__),'data_files','ambient.csv')),'r') #hourly ambient air temperature and RH
         for line in ambient_cond_file:
             if linenum > 0: #skip header
@@ -179,25 +217,6 @@ class WaterHeater():
             debug = 1
 
         return Ttank, Eheat_ts
-                
-        '''
-        mdot_Cp = self.water_Cp * draw_ts * 60 * self.water_density
-        c1 = (self.tank_ua + mdot_Cp) / mCp_tank
-        actual_kW = (self.heat_needed * self.E_heat * (self.actual_voltage ** 2) / (self.nominal_voltage ** 2))
-        c2 = (actual_kW * self.btu_h_to_kW + mdot_Cp * self.inlet_temp + self.tank_ua * ambient_temp) / (self.tank_ua + mdot_Cp)
-        new_temp = c2 - (c2 - self.current_temperature) * math.exp(-c1 * delta_t)
-        #internal_gain = self.tank_ua * (new_temp - ambient_temp);
-        Tlower = self.Tset - self.Tdeadband
-        Tupper = self.Tset
-    
-        if( new_temp <= Tlower + 0.02):
-            self.heat_needed = 1
-        elif( new_temp >= Tupper - 0.02):
-            self.heat_needed = 0
-    
-        self.current_temperature = new_temp
-        return new_temp, actual_kW
-        '''
    
 if __name__ == '__main__':
     wh = WaterHeater()

@@ -48,6 +48,13 @@ RunPeriod,
     Yes;                     !- Increment Day of Week on repeat
 
 
+!-   ===========  ALL OBJECTS IN CLASS: SITE:WATERMAINSTEMPERATURE ===========
+
+Site:WaterMainsTemperature,
+    Schedule,                !- Calculation Method
+    Tmains;                  !- Temperature Schedule Name
+
+
 !-   ===========  ALL OBJECTS IN CLASS: SCHEDULETYPELIMITS ===========
 
 ScheduleTypeLimits,
@@ -96,13 +103,18 @@ Schedule:Constant,
     FRACTION,                !- Schedule Type Limits Name
     1;                       !- Hourly Value
 
+Schedule:Constant,
+    HotTemp,                 !- Name
+    Temperature,             !- Schedule Type Limits Name
+    60;                      !- Hourly Value
+
 
 !-   ===========  ALL OBJECTS IN CLASS: SCHEDULE:FILE ===========
 
 Schedule:File,
     Showers,                 !- Name
     ,                        !- Schedule Type Limits Name
-    C:\Users\jmaguire\Desktop\elec_wh_notebooks\data_files\draw.csv,  !- File Name
+    C:\WaterHeaterPythonModel\data_files\draw.csv,  !- File Name
     1,                       !- Column Number
     1,                       !- Rows to Skip at Top
     8760,                    !- Number of Hours of Data
@@ -113,7 +125,7 @@ Schedule:File,
 Schedule:File,
     Sinks,                   !- Name
     ,                        !- Schedule Type Limits Name
-    C:\Users\jmaguire\Desktop\elec_wh_notebooks\data_files\draw.csv,  !- File Name
+    C:\WaterHeaterPythonModel\data_files\draw.csv,  !- File Name
     2,                       !- Column Number
     1,                       !- Rows to Skip at Top
     8760,                    !- Number of Hours of Data
@@ -124,7 +136,7 @@ Schedule:File,
 Schedule:File,
     Baths,                   !- Name
     ,                        !- Schedule Type Limits Name
-    C:\Users\jmaguire\Desktop\elec_wh_notebooks\data_files\draw.csv,  !- File Name
+    C:\WaterHeaterPythonModel\data_files\draw.csv,  !- File Name
     5,                       !- Column Number
     1,                       !- Rows to Skip at Top
     8760,                    !- Number of Hours of Data
@@ -135,7 +147,7 @@ Schedule:File,
 Schedule:File,
     ClothesWasher,           !- Name
     ,                        !- Schedule Type Limits Name
-    C:\Users\jmaguire\Desktop\elec_wh_notebooks\data_files\draw.csv,  !- File Name
+    C:\WaterHeaterPythonModel\data_files\draw.csv,  !- File Name
     3,                       !- Column Number
     1,                       !- Rows to Skip at Top
     8760,                    !- Number of Hours of Data
@@ -146,7 +158,7 @@ Schedule:File,
 Schedule:File,
     Dishwasher,              !- Name
     ,                        !- Schedule Type Limits Name
-    C:\Users\jmaguire\Desktop\elec_wh_notebooks\data_files\draw.csv,  !- File Name
+    C:\WaterHeaterPythonModel\data_files\draw.csv,  !- File Name
     4,                       !- Column Number
     1,                       !- Rows to Skip at Top
     8760,                    !- Number of Hours of Data
@@ -479,6 +491,12 @@ WaterUse:Connections,
     Dishwasher_hw;           !- Water Use Equipment 5 Name
 
 
+!-   ===========  ALL OBJECTS IN CLASS: OUTPUT:VARIABLEDICTIONARY ===========
+
+Output:VariableDictionary,
+    IDF;                     !- Key Field
+
+
 !-   ===========  ALL OBJECTS IN CLASS: OUTPUT:VARIABLE ===========
 
 Output:Variable,
@@ -514,5 +532,10 @@ Output:Variable,
 Output:Variable,
     *,                       !- Key Value
     Water Heater Use Side Mass Flow Rate,  !- Variable Name
+    Timestep;                !- Reporting Frequency
+
+Output:Variable,
+    *,                       !- Key Value
+    Site Mains Water Temperature,  !- Variable Name
     Timestep;                !- Reporting Frequency
 
