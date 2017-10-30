@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import time
 import numpy
 import basic_water_heater
+from scipy.stats import norm
 
 class WaterHeater():
     def __init__(self):
@@ -113,7 +114,7 @@ class WaterHeater():
         mains_temp_column = 9
         
         linenum = 0
-        '''
+        
         ambient_cond_file = open((os.path.join(os.path.dirname(__file__),'data_files','denver_conditions.csv')),'r') #hourly ambient air temperature and RH
         for line in ambient_cond_file:
             if linenum > 0: #skip header
@@ -142,7 +143,7 @@ class WaterHeater():
                 Tmains.append(float(items[0]))
             linenum += 1
         mains_temp_file.close()
-        
+        '''
         linenum = 0
         hot_draw = []
         mixed_draw = []
