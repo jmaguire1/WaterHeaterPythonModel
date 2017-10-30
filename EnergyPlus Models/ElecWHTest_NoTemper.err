@@ -1,4 +1,4 @@
-Program Version,EnergyPlus, Version 8.7.0-78a111df4a, YMD=2017.10.20 09:44,IDD_Version 8.7.0
+Program Version,EnergyPlus, Version 8.7.0-78a111df4a, YMD=2017.10.26 16:10,IDD_Version 8.7.0
    ** Warning ** For Schedule:File="SHOWERS", Blank Schedule Type Limits Name input -- will not be validated.
    ** Warning ** For Schedule:File="SINKS", Blank Schedule Type Limits Name input -- will not be validated.
    ** Warning ** For Schedule:File="BATHS", Blank Schedule Type Limits Name input -- will not be validated.
@@ -21,4 +21,4 @@ Program Version,EnergyPlus, Version 8.7.0-78a111df4a, YMD=2017.10.20 09:44,IDD_V
    ************* Use Output:Diagnostics,DisplayUnusedSchedules; to see them.
    ************* EnergyPlus Warmup Error Summary. During Warmup: 0 Warning; 0 Severe Errors.
    ************* EnergyPlus Sizing Error Summary. During Sizing: 0 Warning; 0 Severe Errors.
-   ************* EnergyPlus Completed Successfully-- 7 Warning; 0 Severe Errors; Elapsed Time=00hr 00min 29.50sec
+   ************* EnergyPlus Completed Successfully-- 7 Warning; 0 Severe Errors; Elapsed Time=00hr 00min 32.31sec
