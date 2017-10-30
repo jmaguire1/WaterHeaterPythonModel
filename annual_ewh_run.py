@@ -51,7 +51,7 @@ class WaterHeater():
         outputfile.write('T_amb (F), RH_amb (%), Tmains (F), Draw Volume(gal), T_tank (F), E_consumed (Btu), E_delivered (Btu), E_tankloss (Btu) \n')
         
         #Perform minutely calculations
-        for hour in range(8760):#8760 is 1 year
+        for hour in range(168):#8760 is 1 year
             T_amb_ts = float(Tamb[hour])
             RH_amb_ts = float(RHamb[hour])
             Tmains_ts = float(Tmains[hour])
