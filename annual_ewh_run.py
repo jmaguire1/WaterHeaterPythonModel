@@ -23,6 +23,7 @@ class WaterHeater():
         self.Tdeadband = 10.0 #delta F
         Tmixed = 110.0 #F
         self.E_heat = 4.5 #kW
+        
         #preserving these voltage things from GridLAB-D in case this model ever makes it back into there
         self.actual_voltage = 240.0 #V
         self.nominal_voltage = 240.0 #V
@@ -35,9 +36,12 @@ class WaterHeater():
         
         
         #calculate water heater properties
-        EF = 0.91 #Energy Factor
+        FHR = 65 #gal 
+        UEF = 0.90 #Uniform Energy Factor
         V = 50.0 #gal
-        (self.wh_UA, self.wh_eta_c, self.wh_vol) = self.calc_wh_properties(EF,V)
+        ratings_test = 'UEF'
+        
+        (self.wh_UA, self.wh_eta_c, self.wh_vol) = self.calc_wh_properties(ratings_test,FHR,UEF,V)
         self.mCp_tank = self.water_Cp * (self.water_density * self.ft3_to_gal) * self.wh_vol
         #Initialize timestep values
         T_amb_ts = 0.0
@@ -57,30 +61,27 @@ class WaterHeater():
         outputfile.write('T_amb (F), RH_amb (%), Tmains (F), Draw Volume(gal), T_tank (F), E_consumed (Btu), E_delivered (Btu), E_tankloss (Btu) \n')
         
         #Perform minutely calculations
-<<<<<<< HEAD
         for hour in range(168):#8760 is 1 year
-=======
-        days_run = 365
-        hours_run = 24 * days_run
-        for hour in range(hours_run):#8760 is 1 year, 744 is January, 168 is 1 week, 24 is 1 day
->>>>>>> f86b03331ec7c9b4e49261d14b2637bee615f950
-            T_amb_ts = float(Tamb[hour])
-            RH_amb_ts = float(RHamb[hour])
-            Tmains_ts = float(Tmains[hour])
-            for min in range(60):
-                draw_ts = (60 * hour + min)
-                #draw = hot_draw[draw_ts] + mixed_draw[draw_ts] * ((Tmixed - Tmains_ts) / (Tlast - Tmains_ts)) #draw volume in gal
-                draw = hot_draw[draw_ts] + mixed_draw[draw_ts] #draw volume in gal, only draw hot water
-                (Ttank_ts,Econs_ts) = self.execute(Tlast,T_amb_ts,Tmains_ts,draw,draw_ts)
-                Ttank.append(Ttank_ts)
-                Vdraw.append(draw)
-                Econs.append(Econs_ts)
-                Edel_ts = draw * self.water_density * self.water_Cp * (Ttank_ts - Tmains_ts)
-                Eloss_ts = self.wh_UA * (Ttank_ts - T_amb_ts)
-                Edel.append(Edel_ts)
-                Eloss.append(Eloss_ts)
-                outputfile.write(str(T_amb_ts) + ',' + str(RH_amb_ts) + ',' + str(Tmains_ts) + ',' + str(draw) + ',' + str(Ttank_ts) + ',' + str(Econs_ts) + ',' + str(Edel_ts) + ',' + str(Eloss_ts) + '\n')
-                Tlast = Ttank_ts
+            days_run = 365
+            hours_run = 24 * days_run
+            for hour in range(hours_run):#8760 is 1 year, 744 is January, 168 is 1 week, 24 is 1 day
+                T_amb_ts = float(Tamb[hour])
+                RH_amb_ts = float(RHamb[hour])
+                Tmains_ts = float(Tmains[hour])
+                for min in range(60):
+                    draw_ts = (60 * hour + min)
+                    #draw = hot_draw[draw_ts] + mixed_draw[draw_ts] * ((Tmixed - Tmains_ts) / (Tlast - Tmains_ts)) #draw volume in gal
+                    draw = hot_draw[draw_ts] + mixed_draw[draw_ts] #draw volume in gal, only draw hot water
+                    (Ttank_ts,Econs_ts) = self.execute(Tlast,T_amb_ts,Tmains_ts,draw,draw_ts)
+                    Ttank.append(Ttank_ts)
+                    Vdraw.append(draw)
+                    Econs.append(Econs_ts)
+                    Edel_ts = draw * self.water_density * self.water_Cp * (Ttank_ts - Tmains_ts)
+                    Eloss_ts = self.wh_UA * (Ttank_ts - T_amb_ts)
+                    Edel.append(Edel_ts)
+                    Eloss.append(Eloss_ts)
+                    outputfile.write(str(T_amb_ts) + ',' + str(RH_amb_ts) + ',' + str(Tmains_ts) + ',' + str(draw) + ',' + str(Ttank_ts) + ',' + str(Econs_ts) + ',' + str(Edel_ts) + ',' + str(Eloss_ts) + '\n')
+                    Tlast = Ttank_ts
         
         print('Runs complete! Ran {} days.'.format(days_run))
 
@@ -170,24 +171,51 @@ class WaterHeater():
         return Tamb, RHamb, Tmains, hot_draw, mixed_draw
     
     #Calculate water heater properties:
-    def calc_wh_properties(self,EF,vol):
-        #calculates UA and conversion efficiency based on EF and volume using old EF test procedure
-        #TODO: Update this for UEF
-        test_volume_drawn = 64.3 # gal/day
-        test_Tset = 135 # F
-        test_Tin = 58 # F
-        test_Tenv = 67.5 # F
-        draw_mass = test_volume_drawn * self.water_density # lb
-        test_Qload = draw_mass * self.water_Cp * (test_Tset - test_Tin) # Btu/day
-        
-        wh_vol = 0.9 * vol #gal
-        wh_vol_inches = wh_vol * 231
-        wh_height = 48 # inches
-        wh_radius = ((pi * wh_height) / wh_vol_inches) ** 0.5
-        wh_A = 2 * pi * wh_radius * (wh_radius + wh_height)
-        wh_eta_c = 1.0
-        wh_UA = test_Qload * (1 / EF - 1) / ((test_Tset - test_Tenv) * 24)
-        wh_U = wh_UA / wh_A
+    self.
+    def calc_wh_properties(ratings_test,FHR,UEF,V) #calc_wh_properties(self,EF,vol):
+        if ratings_test == 'UEF'
+            test_Tset = 125 #F
+            test_Tin = 58 #F
+            test_Tenv = 67.5 #F
+            
+            if FHR < 18
+                #Very Small Usage Draw Profile
+                test_draw_volume = 10 #gal
+            elif FHR < 51
+                #Small Usage Draw Profile
+                test_draw_volume = 38 #gal
+            elif FHR < 75
+                #Medium Usage Draw Profile
+                test_draw_volume = 55 #gal
+            else
+                #High Usage Draw Profile
+                test_draw_volume = 84 #gal
+            draw mass = test_draw_volume * self.water_density
+            test_Qload = draw_mass * self.water_Cp * (test_Tset - test_Tin)
+            wh_vol = 0.9 * V #gal
+            wh_eta_c = 1.0
+            wh_UA = test_Qload * (1 / UEF - 1) / ((test_Tset - test_Tenv) * 24)
+        elif ratings_test == 'EF'
+             #calculates UA and conversion efficiency based on EF and volume using old EF test procedure
+            #TODO: Update this for UEF
+            test_volume_drawn = 64.3 # gal/day
+            test_Tset = 135 # F
+            test_Tin = 58 # F
+            test_Tenv = 67.5 # F
+            draw_mass = test_volume_drawn * self.water_density # lb
+            test_Qload = draw_mass * self.water_Cp * (test_Tset - test_Tin) # Btu/day
+            
+            wh_vol = 0.9 * V #gal
+            wh_vol_inches = wh_vol * 231
+            wh_height = 48 # inches
+            wh_radius = ((pi * wh_height) / wh_vol_inches) ** 0.5
+            wh_A = 2 * pi * wh_radius * (wh_radius + wh_height)
+            wh_eta_c = 1.0
+            wh_UA = test_Qload * (1 / UEF - 1) / ((test_Tset - test_Tenv) * 24)
+            wh_U = wh_UA / wh_A
+        else
+            raise NameError("Error! Invalid test selected. Pick either the EF or UEF test procedure")
+
         
         return wh_UA, wh_eta_c, wh_vol
     
