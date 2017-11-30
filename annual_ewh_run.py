@@ -6,16 +6,19 @@ import math
 from math import pi
 import matplotlib.pyplot as plt
 import time
-import numpy
+import numpy as np
 import basic_water_heater
 from scipy.stats import norm
 
 class WaterHeater():
     def __init__(self):
         #Declare constants
-        self.timestep = (1/60.0) #hours
+        self.timestep = 1.0 #minutes
+        self.timestep_hour = self.timestep / 60.0 #hours
+        self.timestep_sec = self.timestep * 60.0 #seconds
         self.water_Cp = 1.0007 # Btu/lb-F
         self.water_density = 8.2938 # lb/gal
+        self.water_k = 0.34690 #Btu/hr-ft-F
         self.ft3_to_gal = 7.4805195 #ft^3 to gal unit conversion
         self.gal_to_in3 = 231 #gal to ft^3 unit conversion
         self.kw_to_btu_h = 3412.0 #Btu/h to kW unit conversion
@@ -23,6 +26,30 @@ class WaterHeater():
         self.Tdeadband = 10.0 #delta F
         Tmixed = 110.0 #F
         self.E_heat = 4.5 #kW
+        self.tank_model = 'stratified' #can be either stratified or mixed
+        if self.tank_model == 'stratified':
+            self.n_nodes = 12
+        else:
+            self.n_nodes = 1
+            
+        self.mCp_node = self.water_Cp * self.water_density * self.wh_vol / self.n_nodes
+        m_node = self.water_density * self.wh_vol / self.n_nodes
+        vol_inches = self.wh_vol * 231
+        height = 48 # inches
+        radius = ((pi * height) / vol_inches) ** 0.5
+        A = 2 * pi * radius * (radius + height)
+        U = self.wh_UA / A
+        side_A = 2 * pi * height * radius
+        self.end_A = 2 * pi * radius ** 2
+        self.UA_node = U * (side_A / self.n_nodes)
+        self.UA_end = self.UA_node + (U * self.end_A)
+        self.L = height / n_nodes
+        self.phi = None
+        self.gamma = None
+        self.ctrl_ue = 0
+        self.last_ue = self.ctrl_ue
+        self.ctrl_le = 0
+        self.last_le = self.ctrl_le
         
         #preserving these voltage things from GridLAB-D in case this model ever makes it back into there
         self.actual_voltage = 240.0 #V
@@ -36,7 +63,7 @@ class WaterHeater():
         
         
         #calculate water heater properties
-        FHR = 65 #gal 
+        FHR = 65.0 #gal 
         UEF = 0.90 #Uniform Energy Factor
         V = 50.0 #gal
         ratings_test = 'UEF'
@@ -48,7 +75,10 @@ class WaterHeater():
         RHamb_ts = 0.0
         Tmains_ts = 0.0
         draw_ts = 0.0
-        Tlast = self.Tset
+        if self.tank_model == 'stratified':
+            Tlast = self.Tset * np.ones(self.n_nodes)
+        else: #mixed tank
+            Tlast = self.Tset
         
         #Initialize arrays for the outputs: tank avg temperature, water flow rate, tank consumed energy, tank delivered energy
         Ttank = []
@@ -72,7 +102,10 @@ class WaterHeater():
                     draw_ts = (60 * hour + min)
                     #draw = hot_draw[draw_ts] + mixed_draw[draw_ts] * ((Tmixed - Tmains_ts) / (Tlast - Tmains_ts)) #draw volume in gal
                     draw = hot_draw[draw_ts] + mixed_draw[draw_ts] #draw volume in gal, only draw hot water
-                    (Ttank_ts,Econs_ts) = self.execute(Tlast,T_amb_ts,Tmains_ts,draw,draw_ts)
+                    if self.tank_model == 'stratified':
+                        (Ttank_ts,Econs_ts) = self.stratified_tank_ctrl(Tlast,T_amb_ts,Tmains_ts,draw,draw_ts,draw_ts)
+                    else:
+                        (Ttank_ts,Econs_ts) = self.mixed_tank(Tlast,T_amb_ts,Tmains_ts,draw,draw_ts)
                     Ttank.append(Ttank_ts)
                     Vdraw.append(draw)
                     Econs.append(Econs_ts)
@@ -171,31 +204,31 @@ class WaterHeater():
         return Tamb, RHamb, Tmains, hot_draw, mixed_draw
     
     #Calculate water heater properties:
-    self.
-    def calc_wh_properties(ratings_test,FHR,UEF,V) #calc_wh_properties(self,EF,vol):
-        if ratings_test == 'UEF'
+    def calc_wh_properties(self,ratings_test,FHR,UEF,V):
+        if ratings_test == 'UEF':
             test_Tset = 125 #F
             test_Tin = 58 #F
             test_Tenv = 67.5 #F
             
-            if FHR < 18
+            if FHR < 18:
                 #Very Small Usage Draw Profile
                 test_draw_volume = 10 #gal
-            elif FHR < 51
+            elif FHR < 51:
                 #Small Usage Draw Profile
                 test_draw_volume = 38 #gal
-            elif FHR < 75
+            elif FHR < 75:
                 #Medium Usage Draw Profile
                 test_draw_volume = 55 #gal
-            else
+            else:
                 #High Usage Draw Profile
                 test_draw_volume = 84 #gal
-            draw mass = test_draw_volume * self.water_density
+                
+            draw_mass = test_draw_volume * self.water_density
             test_Qload = draw_mass * self.water_Cp * (test_Tset - test_Tin)
             wh_vol = 0.9 * V #gal
             wh_eta_c = 1.0
             wh_UA = test_Qload * (1 / UEF - 1) / ((test_Tset - test_Tenv) * 24)
-        elif ratings_test == 'EF'
+        elif ratings_test == 'EF':
              #calculates UA and conversion efficiency based on EF and volume using old EF test procedure
             #TODO: Update this for UEF
             test_volume_drawn = 64.3 # gal/day
@@ -206,20 +239,15 @@ class WaterHeater():
             test_Qload = draw_mass * self.water_Cp * (test_Tset - test_Tin) # Btu/day
             
             wh_vol = 0.9 * V #gal
-            wh_vol_inches = wh_vol * 231
-            wh_height = 48 # inches
-            wh_radius = ((pi * wh_height) / wh_vol_inches) ** 0.5
-            wh_A = 2 * pi * wh_radius * (wh_radius + wh_height)
             wh_eta_c = 1.0
             wh_UA = test_Qload * (1 / UEF - 1) / ((test_Tset - test_Tenv) * 24)
-            wh_U = wh_UA / wh_A
-        else
+        else:
             raise NameError("Error! Invalid test selected. Pick either the EF or UEF test procedure")
 
         
         return wh_UA, wh_eta_c, wh_vol
     
-    def execute(self,Tlast,T_amb_ts,Tmains_ts,draw,draw_ts):
+    def mixed_tank(self,Tlast,T_amb_ts,Tmains_ts,draw,draw_ts):
         """ Calculate next temperature and load"""
         mCp = self.water_Cp * self.water_density * self.wh_vol
         
@@ -227,7 +255,7 @@ class WaterHeater():
         a = (1 / mCp) * (self.wh_UA * T_amb_ts + ((draw * 60) * self.water_density * self.water_Cp * Tmains_ts))
         b =(-1 / mCp) * (self.wh_UA + ((draw * 60) * self.water_density * self.water_Cp))
         Eheat_ts = 0
-        Ttank = ((a/b)+Tlast) * math.exp(b * self.timestep) - (a/b)
+        Ttank = ((a/b)+Tlast) * math.exp(b * self.timestep_hour) - (a/b)
         if draw_ts == 0: #First timestep
             self.qheat_last = 0
         if (Ttank < (self.Tset - self.Tdeadband)) or (self.qheat_last > 0 and Ttank < self.Tset):
@@ -235,7 +263,7 @@ class WaterHeater():
             #If the heat is needed, try the heat at full bore and see if the tank overheats
             a = (1 / mCp) * (self.E_heat * self.kw_to_btu_h + self.wh_UA * T_amb_ts + ((draw * 60) * self.water_density * self.water_Cp * Tmains_ts))
             b =(-1 / mCp) * (self.wh_UA + ((draw * 60) * self.water_density * self.water_Cp))
-            Ttank = ((a / b) + Tlast) * math.exp(b * self.timestep) - (a / b)
+            Ttank = ((a / b) + Tlast) * math.exp(b * self.timestep_hour) - (a / b)
             Eheat_ts = self.E_heat * self.kw_to_btu_h / 60 #Btu
             if Ttank > self.Tset:
                 #If the tank overheats, calculate how much heat is needed to actually maintain the setpoint
@@ -250,6 +278,211 @@ class WaterHeater():
             debug = 1
 
         return Ttank, Eheat_ts
-   
+            
+        
+        
+    def update_stratified_wh_temps(self,draw,self.timestep_sec):
+        #Calculate matrix elements for A, B, and C
+        #Refer to MATLAB WH control paper for more deails on how these matrices are set up
+        elem_ua_mid_flow = -(UA_node + (draw * 60 * self.water_density * self.water_Cp)) / self.mCp_node
+        elem_ua_end_flow = -(UA_end + (draw * 60 * self.water_density * self.water_Cp)) / self.mCp_node
+        elem_draw = (draw * 60 * self.water_density * self.water_Cp) / self.mCp_node
+        elem_ua_mid = self.UA_node / self.mCp_node
+        elem_ua_end = self.UA_end / self.mCp_node 
+        elem_input = (self.wh_eta_c * self.E_heat) / self.mCp_node
+        
+        Ac = np.array([elem_ua_end_flow, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                      [elem_draw, elem_ua_mid_flow, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                      [0, elem_draw, elem_ua_mid_flow, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                      [0, 0, elem_draw, elem_ua_mid_flow, 0, 0, 0, 0, 0, 0, 0, 0],
+                      [0, 0, 0, elem_draw, elem_ua_mid_flow, 0, 0, 0, 0, 0, 0, 0],
+                      [0, 0, 0, 0, elem_draw, elem_ua_mid_flow, 0, 0, 0, 0, 0, 0],
+                      [0, 0, 0, 0, 0, elem_draw, elem_ua_mid_flow, 0, 0, 0, 0, 0],
+                      [0, 0, 0, 0, 0, 0, elem_draw, elem_ua_mid_flow, 0, 0, 0, 0],
+                      [0, 0, 0, 0, 0, 0, 0, elem_draw, elem_ua_mid_flow, 0, 0, 0],
+                      [0, 0, 0, 0, 0, 0, 0, 0, elem_draw, elem_ua_mid_flow, 0, 0],
+                      [0, 0, 0, 0, 0, 0, 0, 0, 0, elem_draw, elem_ua_mid_flow, 0],
+                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, elem_draw, elem_ua_end_flow],
+                      dtype ='float')
+        
+        Bc = np.array([0, 0, elem_ua_end, elem_draw],
+                      [0, 0, elem_ua_mid, 0],
+                      [elem_input, 0, elem_ua_mid, 0],
+                      [0, 0, elem_ua_mid, 0],
+                      [0, 0, elem_ua_mid, 0],
+                      [0, 0, elem_ua_mid, 0],
+                      [0, 0, elem_ua_mid, 0],
+                      [0, 0, elem_ua_mid, 0],
+                      [0, elem_input, elem_ua_mid, 0],
+                      [0, 0, elem_ua_mid, 0],
+                      [0, 0, elem_ua_mid, 0],
+                      [0, 0, elem_ua_end, 0],
+                      dtype ='float')
+        
+        Cc = np.array([0,0],
+                      [0,0],
+                      [1,0],
+                      [0,0],
+                      [0,0],
+                      [0,0],
+                      [0,0],
+                      [0,0],
+                      [0,1],
+                      [0,0],
+                      [0,0],
+                      [0,0],
+                      dtype ='float')
+                    
+        n, nb = Ac.shape[1], Bc.shape[1]
+        v = np.vstack((np.hstack((Ac,Bc)) * timestep_sec, np.zeros((nb,nb+n))))
+        s = scipy.linalg.expm(v)
+        self.phi, self.gamma =  s[0:n,0:n], s[0:n,n:n+nb]
+        
+        
+    def stratified_tank_ctrl(self,Tlast,T_amb_ts,Tmains_ts,draw,draw_ts,draw_ts):
+        #Control logic (master/slave) for electric resistance WH
+        if T_upper < (self.Tset - self.Tdeadband):
+            self.ctrl_ue = 1
+        elif T_upper > self.Tset:
+            self.ctrl_ue = 0
+        elif last_ue = 1:
+            self.ctrl_ue = self.last_ue
+        if self.ctrl_ue != 1:
+            if T_lower < (self.Tset - self.Tdeadband):
+                self.ctrl_le = 1
+            elif T_lower > self.Tset:
+                self.ctrl_le = 0
+            elif last_le = 1:
+                self.ctrl_le = self.last_le
+        self.last_ue = self.ctrl_ue
+        self.last_le = self.ctrl_le
+        wh.integrate(self, draw, Tmains_ts,T_amb_ts,self.ctrl_le,self,ctrl_ue,timestep_sec)#(self,Tlast,T_amb_ts,Tmains_ts,draw,draw_ts,draw_ts)
+        
+    def integrate(self, draw, Tmains_ts,T_amb_ts,self.ctrl_le,self,ctrl_ue,timestep_sec):
+        """
+        input:
+            flow: [gal/min]
+            mains_inlet_temp: [F]
+            ambient_temp: [F]
+            control_flag: [unitless]  {0:off, 1:node_1_on or 2:node_2_on}
+            timestep_sec: [sec]
+
+        output:
+            None. The class variables T1 and T2 are updated internally.
+        """
+
+        self.update_stratified_wh_temps(flow, timestep_sec) 
+        #integrate the state-space system
+        for n in range(n_nodes):
+            if n == 0:
+                self.T[n] =     self.phi[n,n]   * self.T[n] + \
+                                self.gamma[n,0] * control_1 + \
+                                self.gamma[n,1] * control_2 + \
+                                self.gamma[n,2] * ambient_temp + \
+                                self.gamma[n,3] * mains_inlet_temp
+                                
+            else:
+                self.T[n] =     self.phi[n,n]   * self.T[n] + \
+                                self.phi[n,n-1]   * self.T[n-1] + \
+                                self.gamma[n,0] * control_1 + \
+                                self.gamma[n,1] * control_2 + \
+                                self.gamma[n,2] * ambient_temp + \
+                                self.gamma[n,3] * mains_inlet_temp
+                
+        for n in range(n_nodes): #check for temperature inversions, mix them out
+            if n > 0:
+                if T[n-1] > T[n]:
+                    T[n] = (T[n-1] + T[n]) / 2
+                    T[n-1] = T[n]
+ 
+            
+        #new_T_noElem = self.phi[,]
+        
+        
+        #new_T2 =    self.phi[1,0]   * self.T1 + \
+        #            self.phi[1,1]   * self.T2 + \
+        #            self.gamma[1,0] * control_1 + \
+        #            self.gamma[1,1] * control_2 + \
+        #            self.gamma[1,2] * ambient_temp +\
+        #            self.gamma[1,3] * mains_inlet_temp
+        
+        #self.
+        #self.T1 = new_T1
+        #self.T2 = new_T2
+        
+        '''    
+            self.q_draw = np.zeros(self.n_nodes)
+            self.q_mix = np.zeros(self.n_nodes)
+            self.q_tankloss = np.zeros(self.n_nodes)
+            self.q_cond = np_zeros(self.n_nodes)
+            self.mdot_mix = 0.5 *(m_node / (60))
+        for n in range(n_nodes):
+            #Heat transfered due to draw
+            if n == 0:
+                q_draw[n] = (draw * 60 * self.water_Cp * (Tmains_ts - Ttank[n])) + (draw * 60 * self.water_Cp * (Ttank[n] - Ttank[n+1]))
+            elif n == (n_nodes - 1):
+                q_draw[n] = (draw * 60 * self.water_Cp * (Ttank[n-1] - Ttank[n])) + (draw * 60 * self.water_Cp * (Ttank[n] - Ttank[n+1]))
+            else:
+                q_draw[n] = (draw * 60 * self.water_Cp * (Ttank[n-1] - Ttank[n])) + (draw * 60 * self.water_Cp * (Ttank[n+1] - Ttank[n]))
+                
+            #Heat transferred due to tank losses
+            if n == 0 or n == (n_nodes - 1):
+                q_tankloss[n] = (self.UA_node + self.UA_end) * (Ttank[n] - T_amb_ts)
+            else:
+                q_tankloss[n] = self.UA_node * (Ttank[n] - T_amb_ts)
+                
+            #Heat transferred due to conduction
+            if n == 0:
+                q_cond[n] = ((self.water_k * self.end_A) / self.L) * (Ttank[n] - Ttank[n+1])
+            elif n == (n_nodes - 1):
+                q_cond[n] = ((self.water_k * self.end_A) / self.L) * (Ttank[n-1] - Ttank[n]) + ((self.water_k * self.end_A) / self.L) * (Ttank[n] - Ttank[n+1])
+            else:
+                q_cond[n] = ((self.water_k * self.end_A) / self.L) * (Ttank[n-1] - Ttank[n])
+            
+            #heat transferred due to mixing
+            if n == 0:
+                q_mix[n] = self.mdot_mix * 60 * self.water_Cp * (Ttank[n] - Ttank[n+1])
+            elif n == (n_nodes - 1):
+                q_mix[n] = (self.mdot_mix * 60 * self.water_Cp * (Ttank[n-1] - Ttank[n])) + (self.mdot_mix * 60 * self.water_Cp * (Ttank[n] - Ttank[n+1]))
+            else:
+                q_mix[n] = self.mdot_mix * 60 * self.water_Cp * (Ttank[n-1] - Ttank[n])
+            
+            if n == 0 or n == (n_nodes - 1):
+                UA_node = wh_UA_end
+            else:
+                UA_node = wh_UA_node
+            q_loss_n = UA_node * (T_amb_ts - T_n)
+            
+            
+        
+        
+        #start by calculating what the tank temperature would be if the heat doesn't come on
+        a = (1 / mCp) * (self.wh_UA * T_amb_ts + ((draw * 60) * self.water_density * self.water_Cp * Tmains_ts))
+        b =(-1 / mCp) * (self.wh_UA + ((draw * 60) * self.water_density * self.water_Cp))
+        Eheat_ts = 0
+        Ttank = ((a/b)+Tlast) * math.exp(b * self.timestep_hour) - (a/b)
+        if draw_ts == 0: #First timestep
+            self.qheat_last = 0
+        if (Ttank < (self.Tset - self.Tdeadband)) or (self.qheat_last > 0 and Ttank < self.Tset):
+            self.qheat_last = 1
+            #If the heat is needed, try the heat at full bore and see if the tank overheats
+            a = (1 / mCp) * (self.E_heat * self.kw_to_btu_h + self.wh_UA * T_amb_ts + ((draw * 60) * self.water_density * self.water_Cp * Tmains_ts))
+            b =(-1 / mCp) * (self.wh_UA + ((draw * 60) * self.water_density * self.water_Cp))
+            Ttank = ((a / b) + Tlast) * math.exp(b * self.timestep_hour) - (a / b)
+            Eheat_ts = self.E_heat * self.kw_to_btu_h / 60 #Btu
+            if Ttank > self.Tset:
+                #If the tank overheats, calculate how much heat is needed to actually maintain the setpoint
+                t_heat = (1 / b) *  math.log(((a / b) + self.Tset)/((a / b) + Tlast))
+                Eheat_ts = t_heat * (self.E_heat * self.kw_to_btu_h)/60
+                Ttank = self.Tset
+                self.qheat_last = 0
+        else:
+            self.qheat_last = 0
+            
+        if Ttank < Tmains_ts:
+            debug = 1
+        
+        return Ttank, Eheat_ts
+       '''
 if __name__ == '__main__':
     wh = WaterHeater()
