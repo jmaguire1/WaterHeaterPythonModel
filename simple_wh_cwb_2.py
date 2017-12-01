@@ -12,7 +12,7 @@ class ChuckWaterHeater():
         #Declare constants
         self.Tdeadband = 1 #delta F
         self.E_heat = 4.5 #kW
-        self.UA = 1 #W/K
+        self.UA = 20 #W/K
 #        self.control = control_signal
         self.Tmin = 105 # deg F
         self.Tmax = 160 # deg F
@@ -73,8 +73,15 @@ class ChuckWaterHeater():
 #            print('add','tlast',Tlast,'tmax=', self.Tmax,'max calls=',max_service_calls,'calls accepted=',service_calls_accepted_ts)
         
         #calculate energy provided as a service, >0 is load add, <0 load shed
-        Eservice_ts = Eused_ts-Eused_baseline_ts
-        
+        # if the magnitude of the service that could be provided is greater than what is requested, just use what is requested and adjust the element on time
+#        print('Available',abs(Eused_ts-Eused_baseline_ts), 'requested',control_signal_ts[1])
+        if abs(Eused_ts-Eused_baseline_ts) > abs(control_signal_ts[1]): 
+            Eservice_ts = control_signal_ts[1]
+            Eused_ts = control_signal_ts[1] + Eused_baseline_ts
+            Element_on_ts = control_signal_ts[1]/(Eused_ts-Eused_baseline_ts)
+        else: # assumes WH can't meet the entire request so it just does as much as it can
+            Eservice_ts = Eused_ts-Eused_baseline_ts
+#        print('provided',Eservice_ts)
         #could change this at some point based on signals
         Tset_ts = Tset
 #        print(service_calls_accepted_ts)    
@@ -85,8 +92,8 @@ class ChuckWaterHeater():
         # second expression in line above is new mixed temperature due to water draw only
         
         SOC = (Ttank_ts - self.Tmin)/(self.Tmax - self.Tmin)
-        isAvailable = 1 if max_service_calls-service_calls_accepted_ts > 0 else 0
-        Available_Capacity = SOC*self.Capacity/3.79*4180*(self.Tmax - self.Tmin)*isAvailable #Joules, 3.79 = kg/gal, 4180 heat cap of water J/kgK
+#        isAvailable = 1 if max_service_calls-service_calls_accepted_ts > 0 else 0
+        Available_Capacity = abs(Eused_ts-Eused_baseline_ts) #SOC*self.Capacity/3.79*4180*(self.Tmax - self.Tmin)*isAvailable #Joules, 3.79 = kg/gal, 4180 heat cap of water J/kgK
         
         return Ttank_ts, Tset_ts, Eused_ts, Eloss_ts, Element_on_ts, Eservice_ts, SOC, Available_Capacity, service_calls_accepted_ts
     

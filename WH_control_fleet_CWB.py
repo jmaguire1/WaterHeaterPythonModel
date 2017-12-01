@@ -11,7 +11,7 @@ from simple_wh_cwb_2 import ChuckWaterHeater
 import random
 
 def main():
-    numWH = 200 #number of water heaters in fleet
+    numWH = 2000 #number of water heaters in fleet
     TtankInitialMean = 125 #deg F
     TtankInitialStddev = 5 #deg F
     TsetInitialMean = 125 #deg F
@@ -21,7 +21,7 @@ def main():
     CapacityMasterList = [50,50,50,50,50,50,50,50,40,40,80] #70% 50 gal, 20% 40 gal, 10% 80 gal
     TypeMasterList = ['ER','ER','ER','ER','ER','ER','ER','ER','ER','HP'] #elec_resis 90% and HPWH 10%
     LocationMasterList =['Conditioned','Conditioned','Conditioned','Conditioned','Unconditioned'] #80% conditioned, 20% unconditioned
-    HotDrawMasterList = [0.4,0.3,0.2, 0.1, 0.05,0.05,0.02,0.01,0.01,0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0]#sample hourly draw pattern. will randomly sample this 
+    HotDrawMasterList = [0.2,0.15,0.1, 0.1, 0.05,0.05,0.02,0.01,0.01,0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0]#sample hourly draw pattern. will randomly sample this 
     # 1x for each house and assume pattern is the same for that house for the entire year
     MaxServiceCallMasterList = [100,80,80, 200, 150, 110, 50, 75, 100]
     
@@ -29,18 +29,23 @@ def main():
         
     # define annual load service request 
     fleet_load_request = []
+    fleet_load_request_magnitude = []
 #    fleet_regulation_request = []
     for hour in range(8760):
-        magnitude_load_add_shed = (1e6 + 5e5*random.random())/numWH #def magnitude of request for load add/shed
+        magnitude_load_add_shed = (7e4 + 2e4*random.random())/(numWH*0.5) #def magnitude of request for load add/shed, assume only 50% of WH will be able to respond so request "too much" load effectively
         if hour % 12 == 0 or hour % 12 == 1 or hour % 12 == 2:
-            service = ['load shed',magnitude_load_add_shed]
+            service = ['load shed',-magnitude_load_add_shed]
+            s = -magnitude_load_add_shed * numWH / 2
         elif hour % 7 == 0 or hour % 7 == 1:
             service = ['load add',magnitude_load_add_shed]
+            s = magnitude_load_add_shed * numWH / 2
         else:
             service = ['none',0]
-            
-        fleet_load_request.append(service)
+            s=0
         
+        fleet_load_request_magnitude.append(s)
+        fleet_load_request.append(service)
+#        print(fleet_load_request[hour][1])
     
 #    #define regulation request separately since timescale is very different
 #    for second in range(1000):
@@ -104,8 +109,11 @@ def main():
 
     whs = [ChuckWaterHeater(Tamb[1], RHamb[1], Tmains[1], Hot_draw[number,1], fleet_load_request[1], Capacity[number], Type[number], Location[number], 0, MaxServiceCalls[number]) for number in range(numWH)]
                
-    for hour in range(8760):    
+    for hour in range(1000):    
         number = 0
+        servsum = 0
+        capsum = 0
+        request = 0
         for wh in whs: #numWH
             if hour == 0:
                 ttank, tset, soC, availableCapacity, serviceCallsAccepted, eservice = wh.execute(TtankInitial[number], TsetInitial[number], Tamb[0], RHamb[0], Tmains[0], Hot_draw[number,0], fleet_load_request[0], 0)
@@ -118,16 +126,25 @@ def main():
                 ttank, tset, soC, availableCapacity, serviceCallsAccepted, eservice = wh.execute(TtankLast, TsetLast, Tamb[hour], RHamb[hour], Tmains[hour], Hot_draw[number,HourOfDay], fleet_load_request[hour],  ServiceCallsAccepted[number][lastHour])
             
             Tset[number][hour] = tset
-#            print(tset)
+#            print('provided',eservice)
             Ttank[number][hour] = ttank
             SoC[number][hour] = soC
             AvailableCapacity[number][hour] = availableCapacity
+            capsum += availableCapacity
             ServiceCallsAccepted[number][hour] = serviceCallsAccepted
             ServiceProvided[number][hour] = eservice
+            servsum += eservice
             TotalServiceProvidedPerWH[number] = TotalServiceProvidedPerWH[number] + ServiceProvided[number][hour]
-            TotalServiceProvidedPerTimeStep[hour] = TotalServiceProvidedPerTimeStep[hour] + ServiceProvided[number][hour]
-#            print(Ttank[number][hour])
+#            print('number',number,'hr',hour,TotalServiceProvidedPerWH)
+#            print('provided per hr',servsum)
+            request += fleet_load_request[hour][1] 
             number += 1
+        TotalServiceProvidedPerTimeStep[hour] += servsum #ServiceProvided[number][hour]
+#    print('ttank',Ttank[0:20][1])
+#    print(number)
+#        print('hr',hour,'provided',TotalServiceProvidedPerTimeStep[hour],'request',request,'available',capsum)
+#            print(Ttank[number][hour])
+            
     
     for n in range(number):
         TotalServiceCallsAcceptedPerWH[n] = ServiceCallsAccepted[n][hour]
@@ -153,6 +170,7 @@ def main():
     plt.plot(Ttank[2][0:20],'k')
     plt.ylabel('Tank Temperature deg F')
     plt.xlabel('Hour')
+    plt.ylim([0,170])
     
     plt.figure(2)
     plt.clf()
@@ -161,11 +179,12 @@ def main():
     plt.plot(SoC[2][0:20],'k<-')
     plt.ylabel('SoC')
     plt.xlabel('Hour')
+    plt.ylim([-0.5,1.2])
     plt.show()
     
     plt.figure(3)
     plt.clf()
-    plt.plot(ServiceCallsAccepted[0][0:20],'r*')
+    plt.plot(ServiceCallsAccepted[0][0:20],'r*-')
     plt.plot(ServiceCallsAccepted[1][0:20],'b')
     plt.plot(ServiceCallsAccepted[2][0:20],'k')
     plt.ylabel('Service Calls Accepted')
@@ -174,31 +193,50 @@ def main():
 
     plt.figure(4)
     plt.clf()
-    plt.plot(ServiceProvided[0][0:20],'r*')
+    plt.plot(ServiceProvided[0][0:20],'r*-')
     plt.plot(ServiceProvided[1][0:20],'b')
     plt.plot(ServiceProvided[2][0:20],'k')
-    plt.ylabel('Service Provided Per Timestep')
+    plt.ylabel('Service Provided Per WH Per Timestep, W')
     plt.xlabel('Hour')
     plt.show()
     
     plt.figure(5)
     plt.clf()
-    plt.plot(TotalServiceProvidedPerTimeStep[0:20],'r*-')
-    plt.ylabel('Total Service Provided by Fleet During Timestep')
+    plt.plot(TotalServiceProvidedPerTimeStep[0:20],'r*-',label='Provided by Fleet')
+    plt.plot(fleet_load_request_magnitude[0:20],'bs-', label ='Requested')
+    plt.ylabel('Total Service During Timestep, W')
     plt.xlabel('Hour')
+    plt.legend()
     plt.show()
     
-    plt.figure(6)
-    plt.clf()
-    plt.hist(TotalServiceProvidedPerWH)
-    plt.xlabel('Service Level, Watts')
-    plt.show()
+#    x = np.linspace(0, 20, 1000)
+#    y1 = np.sin(x)
+#    y2 = np.cos(x)
+#
+#    plt.plot(x, y1, '-b', label='sine')
+#    plt.plot(x, y2, '-r', label='cosine')
+#    plt.legend(loc='upper left')
+#    plt.ylim(-1.5, 2.0)
+#    plt.show()
+    
+#    plt.figure(6)
+#    plt.clf()
+#    plt.hist(TotalServiceProvidedPerWH)
+#    plt.xlabel('Service Level, Watts')
+#    plt.show()
     
     plt.figure(7)
     plt.clf()
     plt.hist(TotalServiceCallsAcceptedPerWH)
     plt.xlabel('Total Service Calls Accepted per WH Annually')
     plt.show()
+    
+#    plt.figure(8)
+#    plt.clf()
+#    plt.plot(Ttank[0:100][0],'r')
+#    plt.xlabel('Tank Temp for all WHs at one timesetp')
+#    plt.xlim([0,100])
+#    plt.show()
 
 def get_annual_conditions():
         Tamb = []
