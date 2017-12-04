@@ -7,7 +7,7 @@ creating and controlling fleet of water heaters
 import numpy as np
 import matplotlib.pyplot as plt
 
-from simple_wh_cwb_2 import ChuckWaterHeater
+from simple_wh_cwb_3 import ChuckWaterHeater
 import random
 
 def main():
@@ -16,6 +16,7 @@ def main():
     TtankInitialStddev = 5 #deg F
     TsetInitialMean = 125 #deg F
     TsetInitialStddev = 5 #deg F
+    minSOC = 0.2 # minimum SoC for aggregator to call for a service
     
     # for capacity, type and location need to specify discrete values and sample in such a way as to get overall distribution that I want 
     CapacityMasterList = [50,50,50,50,50,50,50,50,40,40,80] #70% 50 gal, 20% 40 gal, 10% 80 gal
@@ -29,7 +30,7 @@ def main():
         
     # define annual load service request 
     fleet_load_request = []
-    fleet_load_request_magnitude = []
+    fleet_load_request_total = []
 #    fleet_regulation_request = []
     for hour in range(8760):
         magnitude_load_add_shed = (7e4 + 2e4*random.random())/(numWH*0.5) #def magnitude of request for load add/shed, assume only 50% of WH will be able to respond so request "too much" load effectively
@@ -43,7 +44,7 @@ def main():
             service = ['none',0]
             s=0
         
-        fleet_load_request_magnitude.append(s)
+        fleet_load_request_total.append(s)
         fleet_load_request.append(service)
 #        print(fleet_load_request[hour][1])
     
@@ -103,32 +104,54 @@ def main():
     AvailableCapacity = [[0 for x in range(8760)] for y in range(numWH)]
     ServiceCallsAccepted = [[0 for x in range(8760)] for y in range(numWH)]
     ServiceProvided = [[0 for x in range(8760)] for y in range(numWH)]
+    IsAvailable = [[0 for x in range(8760)] for y in range(numWH)]
     TotalServiceProvidedPerWH = [0 for y in range(numWH)]
     TotalServiceProvidedPerTimeStep = [0 for y in range(8760)]
     TotalServiceCallsAcceptedPerWH = [0 for y in range(numWH)]
 
     whs = [ChuckWaterHeater(Tamb[1], RHamb[1], Tmains[1], Hot_draw[number,1], fleet_load_request[1], Capacity[number], Type[number], Location[number], 0, MaxServiceCalls[number]) for number in range(numWH)]
                
-    for hour in range(1000):    
+    for hour in range(8760):    
         number = 0
         servsum = 0
         capsum = 0
         request = 0
+        NumDevicesToCall = 0
+        lastHour = hour - 1
+        if hour > 0:
+#            print(fleet_load_request[hour])
+            #decision making about which WH to call on for service, check if available at last hour, if so then 
+            # check for SoC > X%, whatever number that is, divide the total needed and ask for that for each
+            for n in range(numWH):
+                if IsAvailable[n][lastHour] > 0 and SoC[n][lastHour] > minSOC:
+                    NumDevicesToCall += 1
+            
+    #                    print('num devices',NumDevicesToCall,'is avail',IsAvailable[n][lastHour],'soc',SoC[n][lastHour])
+            if fleet_load_request[hour][1] != 0 and NumDevicesToCall > 0: #if a service is called for and there are some devices that can respond
+                newrequest = fleet_load_request_total[hour] % NumDevicesToCall
+            else:
+                newrequest = fleet_load_request_total[hour]
+                
+            fleet_load_request[hour] = [fleet_load_request[hour][0],newrequest]
+#            print(fleet_load_request[hour])
+#            print('num devices',NumDevicesToCall)
         for wh in whs: #numWH
             if hour == 0:
-                ttank, tset, soC, availableCapacity, serviceCallsAccepted, eservice = wh.execute(TtankInitial[number], TsetInitial[number], Tamb[0], RHamb[0], Tmains[0], Hot_draw[number,0], fleet_load_request[0], 0)
+                ttank, tset, soC, availableCapacity, serviceCallsAccepted, eservice, isAvailable = wh.execute(TtankInitial[number], TsetInitial[number], Tamb[0], RHamb[0], Tmains[0], Hot_draw[number,0], fleet_load_request[0], 0)
             else:
-                lastHour = hour - 1
+                
                 TsetLast = Tset[number][lastHour]
                 TtankLast = Ttank[number][lastHour]
 #                print(TtankLast)
                 HourOfDay = hour % 24
-                ttank, tset, soC, availableCapacity, serviceCallsAccepted, eservice = wh.execute(TtankLast, TsetLast, Tamb[hour], RHamb[hour], Tmains[hour], Hot_draw[number,HourOfDay], fleet_load_request[hour],  ServiceCallsAccepted[number][lastHour])
+                
+                ttank, tset, soC, availableCapacity, serviceCallsAccepted, eservice, isAvailable = wh.execute(TtankLast, TsetLast, Tamb[hour], RHamb[hour], Tmains[hour], Hot_draw[number,HourOfDay], fleet_load_request[hour],  ServiceCallsAccepted[number][lastHour])
             
             Tset[number][hour] = tset
 #            print('provided',eservice)
             Ttank[number][hour] = ttank
             SoC[number][hour] = soC
+            IsAvailable[number][hour] = isAvailable
             AvailableCapacity[number][hour] = availableCapacity
             capsum += availableCapacity
             ServiceCallsAccepted[number][hour] = serviceCallsAccepted
@@ -165,11 +188,12 @@ def main():
 #    print(len(Ttank[0][:]))
     plt.figure(1)
     plt.clf()
-    plt.plot(Ttank[0][0:20],'r')
-    plt.plot(Ttank[1][0:20],'b')
-    plt.plot(Ttank[2][0:20],'k')
+    plt.plot(Ttank[0][0:20],'r',label = 'WH 1')
+    plt.plot(Ttank[1][0:20],'b',label = 'WH 2')
+    plt.plot(Ttank[2][0:20],'k',label = 'WH 3')
     plt.ylabel('Tank Temperature deg F')
     plt.xlabel('Hour')
+    plt.legend()
     plt.ylim([0,170])
     
     plt.figure(2)
@@ -203,7 +227,7 @@ def main():
     plt.figure(5)
     plt.clf()
     plt.plot(TotalServiceProvidedPerTimeStep[0:20],'r*-',label='Provided by Fleet')
-    plt.plot(fleet_load_request_magnitude[0:20],'bs-', label ='Requested')
+    plt.plot(fleet_load_request_total[0:20],'bs-', label ='Requested')
     plt.ylabel('Total Service During Timestep, W')
     plt.xlabel('Hour')
     plt.legend()
@@ -237,6 +261,16 @@ def main():
 #    plt.xlabel('Tank Temp for all WHs at one timesetp')
 #    plt.xlim([0,100])
 #    plt.show()
+    
+    plt.figure(9)
+    plt.clf()
+    plt.plot(AvailableCapacity[0][0:20],'rs-',label='0')
+    plt.plot(AvailableCapacity[0][0:20],'b*-',label='1')
+    plt.plot(AvailableCapacity[0][0:20],'k<-',label='2')
+    plt.ylabel('Available Capacity, W')
+    plt.xlabel('Hour')
+    plt.legend()
+    plt.show()
 
 def get_annual_conditions():
         Tamb = []
