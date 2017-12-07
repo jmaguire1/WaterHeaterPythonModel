@@ -11,9 +11,9 @@ from simple_wh_cwb_4 import ChuckWaterHeater
 import random
 
 def main():
-    numWH = 50 #number of water heaters in fleet
-    RunHours = 50 #num hours in simulation
-    lengthRegulation = 100# num of 4-second steps for regulation signal
+    numWH = 1000 #number of water heaters in fleet
+    RunHours = 10 #num hours in simulation
+    lengthRegulation = 900# num of 4-second steps for regulation signal
     TtankInitialMean = 125 #deg F
     TtankInitialStddev = 5 #deg F
     TsetInitialMean = 125 #deg F
@@ -137,7 +137,7 @@ def main():
     AvailableCapacityShedReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)] 
     ServiceCallsAcceptedReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)] 
     ServiceProvidedReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)]
-    TotalServiceProvidedPerWHReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)]
+    TotalServiceProvidedPerWHReg = [0 for y in range(numWH)]
     TotalServiceProvidedPerTimeStepReg = [0 for y in range(lengthRegulation)]
     TotalServiceCallsAcceptedPerWHReg = [0 for y in range(numWH)]
     
@@ -221,6 +221,7 @@ def main():
             
             for step in range(lengthRegulation):
                 NumDevicesToCall = 0
+                servsumReg = 0
                 #assume this won't be called unless hour > 0
                 number = 0 #need to reset since i'll be looping through a different timestep
                 if step == 0:
@@ -240,7 +241,7 @@ def main():
                 
                 #figure out how much to ask of each device
                 if fleet_regulation_request[step][1] != 0 and NumDevicesToCall > 0: 
-                    newrequest = fleet_regulation_request[step][1] / (NumDevicesToCall/(9.5*np.exp(-numWH/20)+1)) #9.5*exp(-numWH/20)+1 ad hoc curve fit based on trying numWH = 20,30,10,200 and doing hand curve fit. NOTE: THIS IS FOR UA = 30, COULD CHANGE IF THIS IS CHANGED
+                    newrequest = fleet_regulation_request[step][1] / (NumDevicesToCall/(1.0*np.exp(-numWH/500)+1)) #ad hoc curve fit based on some trial runs and just looking at whatfleet provides vs what is asked
                 else:
                     newrequest = fleet_regulation_request[step][1]
                         
@@ -249,9 +250,11 @@ def main():
                 
                 for wh in whs: #numWH, assume won't be called unless hour > 0        
 #                    TsetLast = Tset[number][llastStepastHour]# dont' change during regulation
-                    if step > 0:
+                    if step == 0:
+                        TtankLast = Ttank[number][lastStep]
+                    else:
                         TtankLast = TtankReg[number][lastStep]
-                    
+#                    print(TtankLast, 'num',number,'step',step)
     
                     ttank, tset, soC, availableCapacityAdd, availableCapacityShed, serviceCallsAccepted, eservice, isAvailable = wh.execute(TtankLast, TsetLast, Tamb[hour], RHamb[hour], Tmains[hour], Hot_draw[number,HourOfDay], fleet_regulation_request[step],  ServiceCallsAcceptedReg[number][lastStep])
     #                print('WH num',number,'tank',ttank,'soc',soC,'calls accepted', serviceCallsAccepted,'available?',isAvailable,'request',fleet_load_request[hour])
@@ -265,8 +268,11 @@ def main():
                     AvailableCapacityShedReg[number][step] = availableCapacityShed
                     ServiceCallsAcceptedReg[number][step] = serviceCallsAccepted
                     ServiceProvidedReg[number][step] = eservice
-                    servsum += eservice
-#                    TotalServiceProvidedPerWHReg[number] = TotalServiceProvidedPerWHReg[number] + eservice            
+                    servsumReg += eservice
+                    TotalServiceProvidedPerWHReg[number] = TotalServiceProvidedPerWHReg[number] + ServiceProvidedReg[number][step]
+#                    print(ServiceProvidedReg[number][step])
+#                    print(TotalServiceProvidedPerWHReg[number])
+#                    print(eservice)
                     if step == lengthRegulation: # save variables to change back to hourly
                         Ttank[number][hour] = ttank
                         SoC[number][hour] = soC
@@ -279,10 +285,11 @@ def main():
                         TotalServiceProvidedPerWH[number] = TotalServiceProvidedPerWH[number] + ServiceProvided[number][hour]
         #            print('number',number,'hr',hour,TotalServiceProvidedPerWH)
         #            print('provided per hr',servsum) 
-#                    
                     number += 1
+                TotalServiceProvidedPerTimeStepReg[step] += servsumReg
 #                print(TtankReg[number][step])
-                TotalServiceProvidedPerTimeStepReg[hour] += servsum #ServiceProvided[number][hour]
+                    
+                TotalServiceProvidedPerTimeStep[hour] += servsum #update for the next hour when no longer in regulation mode
                 
                 for n in range(number):
                     TotalServiceCallsAcceptedPerWHReg[n] = ServiceCallsAcceptedReg[n][step]
@@ -442,9 +449,9 @@ def main():
     
     plt.figure(13)
     plt.clf()
-    plt.plot(ServiceCallsAcceptedReg[0][0:20],'r*-',label = 'WH 1')
-    plt.plot(ServiceCallsAcceptedReg[1][0:20],'bs-',label = 'WH 2')
-    plt.plot(ServiceCallsAcceptedReg[2][0:20],'k<-',label = 'WH 3')
+    plt.plot(ServiceCallsAcceptedReg[0][0:50],'r*-',label = 'WH 1')
+    plt.plot(ServiceCallsAcceptedReg[1][0:50],'bs-',label = 'WH 2')
+    plt.plot(ServiceCallsAcceptedReg[2][0:50],'k<-',label = 'WH 3')
     plt.ylabel('Service Calls Accepted')
     plt.xlabel('Regulation Timestep')
     plt.legend()
@@ -463,8 +470,8 @@ def main():
     plt.figure(15)
     plt.clf()
 #    plt.plot(TotalServiceProvided[0:20],'r*-',label='Provided by Fleet')
-    plt.plot(TotalServiceProvidedPerTimeStepReg[0:20],'r*-',label='Provided by Fleet')
-    plt.plot(fleet_regulation_request_magnitude[0:20],'bs-', label ='Requested')
+    plt.plot(TotalServiceProvidedPerTimeStepReg[0:50],'r*-',label='Provided by Fleet')
+    plt.plot(fleet_regulation_request_magnitude[0:50],'bs-', label ='Requested')
     plt.ylabel('Total Service During Timestep, W')
     plt.xlabel('Regulation Timestep')
     plt.legend()
@@ -485,9 +492,9 @@ def main():
     
     plt.figure(17)
     plt.clf()
-    plt.plot(AvailableCapacityAddReg[0][0:20],'r*-',label='0')
-    plt.plot(AvailableCapacityAddReg[1][0:20],'bs-',label='1')
-    plt.plot(AvailableCapacityAddReg[2][0:20],'k<-',label='2')
+    plt.plot(AvailableCapacityAddReg[0][0:50],'r*-',label='0')
+    plt.plot(AvailableCapacityAddReg[1][0:50],'bs-',label='1')
+    plt.plot(AvailableCapacityAddReg[2][0:50],'k<-',label='2')
     plt.ylabel('Available Capacity for Load Add, W-hr')
     plt.xlabel('Regulation Timestep')
     plt.legend()
@@ -495,9 +502,9 @@ def main():
     
     plt.figure(18)
     plt.clf()
-    plt.plot(AvailableCapacityShedReg[0][0:20],'r*-',label='0')
-    plt.plot(AvailableCapacityShedReg[1][0:20],'bs-',label='1')
-    plt.plot(AvailableCapacityShedReg[2][0:20],'k<-',label='2')
+    plt.plot(AvailableCapacityShedReg[0][0:50],'r*-',label='0')
+    plt.plot(AvailableCapacityShedReg[1][0:50],'bs-',label='1')
+    plt.plot(AvailableCapacityShedReg[2][0:50],'k<-',label='2')
     plt.ylabel('Available Capacity for Load Shed, W-hr')
     plt.xlabel('Regulation Timestep')
     plt.legend()
