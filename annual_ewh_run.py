@@ -13,6 +13,7 @@ from scipy.stats import norm
 class WaterHeater():
     def __init__(self):
         #Declare constants
+        self.initial_time = time.time()
         self.timestep = 1.0 #minutes
         self.timestep_hour = self.timestep / 60.0 #hours
         self.timestep_sec = self.timestep * 60.0 #seconds
@@ -26,24 +27,11 @@ class WaterHeater():
         self.Tdeadband = 10.0 #delta F
         Tmixed = 110.0 #F
         self.E_heat = 4.5 #kW
-        self.tank_model = 'stratified' #can be either stratified or mixed
+        self.tank_model = 'mixed' #can be either stratified or mixed
         if self.tank_model == 'stratified':
             self.n_nodes = 12
         else:
             self.n_nodes = 1
-            
-        self.mCp_node = self.water_Cp * self.water_density * self.wh_vol / self.n_nodes
-        m_node = self.water_density * self.wh_vol / self.n_nodes
-        vol_inches = self.wh_vol * 231
-        height = 48 # inches
-        radius = ((pi * height) / vol_inches) ** 0.5
-        A = 2 * pi * radius * (radius + height)
-        U = self.wh_UA / A
-        side_A = 2 * pi * height * radius
-        self.end_A = 2 * pi * radius ** 2
-        self.UA_node = U * (side_A / self.n_nodes)
-        self.UA_end = self.UA_node + (U * self.end_A)
-        self.L = height / n_nodes
         self.phi = None
         self.gamma = None
         self.ctrl_ue = 0
@@ -56,12 +44,16 @@ class WaterHeater():
         self.nominal_voltage = 240.0 #V
         self.climate_location = 'denver' #TODO: is location a climate zone, 
         self.installation_location = 'living' #Options are living, unfinished basement, garage, or attic 
+        self.num_bedrooms = 3 #From 1-5
+        self.unit_num = 0 #From 0-9
+        self.days_shift = 180 #From 0-364
+        if self.days_shift > 364:
+            self.days_shift = self.days_shift % 365
+            print('Days shifted is greater than 365, will use {} as the number of days shifted'.format(self.days_shift))
         #TODO: should we allow other location installations (finished basement, crawlspaces, outside?)
-        (Tamb, RHamb, Tmains, hot_draw, mixed_draw) = self.get_annual_conditions()
-        
         #Load ambient conditions from files
-        
-        
+        (Tamb, RHamb, Tmains, hot_draw, mixed_draw) = self.get_annual_conditions(self.days_shift,self.num_bedrooms,self.unit_num)
+
         #calculate water heater properties
         FHR = 65.0 #gal 
         UEF = 0.90 #Uniform Energy Factor
@@ -69,7 +61,18 @@ class WaterHeater():
         ratings_test = 'UEF'
         
         (self.wh_UA, self.wh_eta_c, self.wh_vol) = self.calc_wh_properties(ratings_test,FHR,UEF,V)
-        self.mCp_tank = self.water_Cp * (self.water_density * self.ft3_to_gal) * self.wh_vol
+        self.mCp_node = self.water_Cp * self.water_density * self.wh_vol / self.n_nodes
+        m_node = self.water_density * self.wh_vol / self.n_nodes
+        vol_inches = self.wh_vol * 231
+        height = 48 # inches
+        radius = ((pi * height) / vol_inches) ** 0.5
+        A = 2 * pi * radius * (radius + height)
+        U = self.wh_UA / A
+        side_A = 2 * pi * height * radius
+        self.end_A = 2 * pi * radius ** 2
+        self.UA_node = U * (side_A / self.n_nodes)
+        self.UA_end = self.UA_node + (U * self.end_A)
+        self.L = height / self.n_nodes
         #Initialize timestep values
         T_amb_ts = 0.0
         RHamb_ts = 0.0
@@ -91,42 +94,37 @@ class WaterHeater():
         outputfile.write('T_amb (F), RH_amb (%), Tmains (F), Draw Volume(gal), T_tank (F), E_consumed (Btu), E_delivered (Btu), E_tankloss (Btu) \n')
         
         #Perform minutely calculations
-        for hour in range(168):#8760 is 1 year
-            days_run = 365
-            hours_run = 24 * days_run
-            for hour in range(hours_run):#8760 is 1 year, 744 is January, 168 is 1 week, 24 is 1 day
-                T_amb_ts = float(Tamb[hour])
-                RH_amb_ts = float(RHamb[hour])
-                Tmains_ts = float(Tmains[hour])
-                for min in range(60):
-                    draw_ts = (60 * hour + min)
-                    #draw = hot_draw[draw_ts] + mixed_draw[draw_ts] * ((Tmixed - Tmains_ts) / (Tlast - Tmains_ts)) #draw volume in gal
-                    draw = hot_draw[draw_ts] + mixed_draw[draw_ts] #draw volume in gal, only draw hot water
-                    if self.tank_model == 'stratified':
-                        (Ttank_ts,Econs_ts) = self.stratified_tank_ctrl(Tlast,T_amb_ts,Tmains_ts,draw,draw_ts,draw_ts)
-                    else:
-                        (Ttank_ts,Econs_ts) = self.mixed_tank(Tlast,T_amb_ts,Tmains_ts,draw,draw_ts)
-                    Ttank.append(Ttank_ts)
-                    Vdraw.append(draw)
-                    Econs.append(Econs_ts)
-                    Edel_ts = draw * self.water_density * self.water_Cp * (Ttank_ts - Tmains_ts)
-                    Eloss_ts = self.wh_UA * (Ttank_ts - T_amb_ts)
-                    Edel.append(Edel_ts)
-                    Eloss.append(Eloss_ts)
-                    outputfile.write(str(T_amb_ts) + ',' + str(RH_amb_ts) + ',' + str(Tmains_ts) + ',' + str(draw) + ',' + str(Ttank_ts) + ',' + str(Econs_ts) + ',' + str(Edel_ts) + ',' + str(Eloss_ts) + '\n')
-                    Tlast = Ttank_ts
-        
+        days_run = 3
+        hours_run = 24 * days_run
+        for hour in range(hours_run):#8760 is 1 year, 744 is January, 168 is 1 week, 24 is 1 day
+            T_amb_ts = float(Tamb[hour])
+            RH_amb_ts = float(RHamb[hour])
+            Tmains_ts = float(Tmains[hour])
+            print('Starting hour {}'.format(hour + 1))
+            for min in range(60):
+                draw_ts = (60 * hour + min)
+                draw = hot_draw[draw_ts] + mixed_draw[draw_ts] * ((Tmixed - Tmains_ts) / (Tlast - Tmains_ts)) #draw volume in gal
+                #draw = hot_draw[draw_ts] + mixed_draw[draw_ts] #draw volume in gal, only draw hot water
+                if self.tank_model == 'stratified':
+                    (Ttank_ts,Econs_ts) = self.stratified_tank_ctrl(Tlast,T_amb_ts,Tmains_ts,draw,draw_ts,draw_ts)
+                else:
+                    (Ttank_ts,Econs_ts) = self.mixed_tank(Tlast,T_amb_ts,Tmains_ts,draw,draw_ts)
+                Ttank.append(Ttank_ts)
+                Vdraw.append(draw)
+                Econs.append(Econs_ts)
+                Edel_ts = draw * self.water_density * self.water_Cp * (Ttank_ts - Tmains_ts)
+                Eloss_ts = self.wh_UA * (Ttank_ts - T_amb_ts)
+                Edel.append(Edel_ts)
+                Eloss.append(Eloss_ts)
+                outputfile.write(str(T_amb_ts) + ',' + str(RH_amb_ts) + ',' + str(Tmains_ts) + ',' + str(draw) + ',' + str(Ttank_ts) + ',' + str(Econs_ts) + ',' + str(Edel_ts) + ',' + str(Eloss_ts) + '\n')
+                Tlast = Ttank_ts
+        self.time_finised = time.time()
+        run_time_total = self.time_finised - self.initial_time
         print('Runs complete! Ran {} days.'.format(days_run))
-
-        #fig=plt.figure()
-        #ax=plt.subplot(111)
-        #ax.plot(Ttank_ts)
-        #ax.plot(Econs_ts)
-        #plt.show()
-        #time.sleep(10)
+        print('Total run time is {} seconds'.format(run_time_total))
 
     
-    def get_annual_conditions(self):
+    def get_annual_conditions(self,days_shift,n_br,unit):
         #reads from 8760 (or 8760 * 60) input files for ambient air temp, RH, mains temp, and draw profile and loads data into arrays for future use
         #TODO: RH is currently unused, will need to import some psych calculations to get a WB
         #TODO: Use a .epw weather file? We'll eventually need atmospheric pressure (for psych calcs), could also estimate unconditioned space temp/rh based on ambient or calc mains directly based on weather file info
@@ -162,44 +160,89 @@ class WaterHeater():
                 Tmains.append(float(items[mains_temp_column]))
             linenum += 1
         ambient_cond_file.close()
-        '''
-        ambient_cond_file = open((os.path.join(os.path.dirname(__file__),'data_files','ambient.csv')),'r') #hourly ambient air temperature and RH
-        for line in ambient_cond_file:
-            if linenum > 0: #skip header
-                items = line.strip().split(',')
-                Tamb.append(float(items[0]))
-                RHamb.append(float(items[1]))
-            linenum += 1
-        ambient_cond_file.close()
         
+        #Read in max and average values for the draw profiles
+        #TODO: we only need to do this once when we start running a large number of water heaters, we might want to break this out into somewhere else where we only read this file once while initializing
         linenum = 0
-        Tmains = []
-        mains_temp_file = open((os.path.join(os.path.dirname(__file__),'data_files','tmains.csv')),'r') #hourly inlet water temperature
-        for line in mains_temp_file:
+        n_beds = 0
+        n_unit = 0
+        
+        #Total gal/day draw numbers based on BA HSP
+        sh_hsp_tot = 14.0 + 4.67 * float(n_br)
+        s_hsp_tot = 12.5 + 4.16 * float(n_br)
+        cw_hsp_tot = 2.35 + 0.78 * float(n_br)
+        dw_hsp_tot = 2.26 + 0.75 * float(n_br)
+        b_hsp_tot = 3.50 + 1.17 * float(n_br)
+        
+        sh_max = np.zeros((5,10))
+        s_max = np.zeros((5,10))
+        b_max = np.zeros((5,10))
+        cw_max = np.zeros((5,10))
+        dw_max = np.zeros((5,10))
+        sh_sum = np.zeros((5,10))
+        s_sum = np.zeros((5,10))
+        b_sum = np.zeros((5,10))
+        cw_sum = np.zeros((5,10))
+        dw_sum = np.zeros((5,10))
+        
+        sum_max_flows_file = open((os.path.join(os.path.dirname(__file__),'data_files', 'DrawProfiles','MinuteDrawProfilesMaxFlows.csv')),'r') #sum and max flows for all units and # of bedrooms
+        for line in sum_max_flows_file:
             if linenum > 0:
                 items = line.strip().split(',')
-                Tmains.append(float(items[0]))
+                n_beds = float(items[0]) - 1
+                n_unit = float(items[1])
+                 #column is unit number, row is # of bedrooms. Taken directly from BEopt
+                sh_max[n_beds, n_unit] = float(items[2])
+                s_max[n_beds, n_unit] = float(items[3])
+                b_max[n_beds, n_unit] = float(items[4])
+                cw_max[n_beds, n_unit] = float(items[5])
+                dw_max[n_beds, n_unit] = float(items[6])
+                sh_sum[n_beds, n_unit] = float(items[7])
+                s_sum[n_beds, n_unit] = float(items[8])
+                b_sum[n_beds, n_unit] = float(items[9])
+                cw_sum[n_beds, n_unit] = float(items[10])
+                dw_sum[n_beds, n_unit] = float(items[11])
             linenum += 1
-        mains_temp_file.close()
-        '''
+        sum_max_flows_file.close()
+        
         linenum = 0
-        hot_draw = []
-        mixed_draw = []
-        draw_profile_file = open((os.path.join(os.path.dirname(__file__),'data_files','draw.csv')),'r') #minutely draw profile (shower, sink, CW, DW, bath)
+        #Read in individual draw profiles
+        yr_min = 60 * 24 * 365
+        hot_draw = np.zeros((yr_min,1))
+        mixed_draw = np.zeros((yr_min,1))
+        #take into account days shifted
+        draw_idx = 60 * 24 * days_shift
+        draw_profile_file = open((os.path.join(os.path.dirname(__file__),'data_files','DrawProfiles','DHWDrawSchedule_{}bed_unit{}_1min_fraction.csv'.format(n_br,unit))),'r') #minutely draw profile (shower, sink, CW, DW, bath)
         for line in draw_profile_file:
             if linenum > 0:
                 items = line.strip().split(',')
-                sh_draw = float(items[0])
-                s_draw = float(items[1])
-                cw_draw = float(items[2])
-                dw_draw = float(items[3])
-                b_draw = float(items[4])
-                hot_flow = cw_draw + dw_draw
-                mixed_flow = sh_draw + s_draw + b_draw
-                hot_draw.append(hot_flow)
-                mixed_draw.append(mixed_flow)
+                hot_flow = 0
+                mixed_flow = 0
+                if items[0] != '':
+                    sh_draw = float(items[0]) * sh_max[n_br,unit] * (sh_hsp_tot / sh_sum[n_br,unit])
+                    mixed_flow += sh_draw
+                if items[1] != '':
+                    s_draw = float(items[1]) * s_max[n_br,unit] * (s_hsp_tot / s_sum[n_br,unit])
+                    mixed_flow += s_draw
+                if items[2] != '':
+                    cw_draw = float(items[2]) * cw_max[n_br,unit] * (cw_hsp_tot / cw_sum[n_br,unit])
+                    hot_flow += cw_draw
+                if items[3] != '':
+                    dw_draw = float(items[3]) * dw_max[n_br,unit] * (dw_hsp_tot / dw_sum[n_br,unit])
+                    hot_flow += dw_draw
+                if items[4] != '':
+                    b_draw = float(items[4]) * b_max[n_br,unit] * (b_hsp_tot / b_sum[n_br,unit])
+                    mixed_flow += b_draw
+                hot_draw[draw_idx] = hot_flow
+                mixed_draw[draw_idx] = mixed_flow
             linenum += 1
+            draw_idx += 1
+            if draw_idx >= yr_min:
+                draw_idx = 0
         draw_profile_file.close()
+        time_draw_profile_completed = time.time()
+        time_load_draw = time_draw_profile_completed - self.initial_time
+        print("Loaded draw profile after {} seconds".format(time_load_draw))
         
         return Tamb, RHamb, Tmains, hot_draw, mixed_draw
     
@@ -281,7 +324,7 @@ class WaterHeater():
             
         
         
-    def update_stratified_wh_temps(self,draw,self.timestep_sec):
+    def update_stratified_wh_temps(self,draw, timestep_sec):
         #Calculate matrix elements for A, B, and C
         #Refer to MATLAB WH control paper for more deails on how these matrices are set up
         elem_ua_mid_flow = -(UA_node + (draw * 60 * self.water_density * self.water_Cp)) / self.mCp_node
@@ -339,26 +382,26 @@ class WaterHeater():
         self.phi, self.gamma =  s[0:n,0:n], s[0:n,n:n+nb]
         
         
-    def stratified_tank_ctrl(self,Tlast,T_amb_ts,Tmains_ts,draw,draw_ts,draw_ts):
+    def stratified_tank_ctrl(self,Tlast,T_amb_ts,Tmains_ts,draw,draw_ts):
         #Control logic (master/slave) for electric resistance WH
         if T_upper < (self.Tset - self.Tdeadband):
             self.ctrl_ue = 1
         elif T_upper > self.Tset:
             self.ctrl_ue = 0
-        elif last_ue = 1:
+        elif last_ue == 1:
             self.ctrl_ue = self.last_ue
         if self.ctrl_ue != 1:
             if T_lower < (self.Tset - self.Tdeadband):
                 self.ctrl_le = 1
             elif T_lower > self.Tset:
                 self.ctrl_le = 0
-            elif last_le = 1:
+            elif last_le == 1:
                 self.ctrl_le = self.last_le
         self.last_ue = self.ctrl_ue
         self.last_le = self.ctrl_le
         wh.integrate(self, draw, Tmains_ts,T_amb_ts,self.ctrl_le,self,ctrl_ue,timestep_sec)#(self,Tlast,T_amb_ts,Tmains_ts,draw,draw_ts,draw_ts)
         
-    def integrate(self, draw, Tmains_ts,T_amb_ts,self.ctrl_le,self,ctrl_ue,timestep_sec):
+    def integrate(self, draw, Tmains_ts,T_amb_ts,ctrl_le,ctrl_ue,timestep_sec):
         """
         input:
             flow: [gal/min]
@@ -371,7 +414,7 @@ class WaterHeater():
             None. The class variables T1 and T2 are updated internally.
         """
 
-        self.update_stratified_wh_temps(flow, timestep_sec) 
+        self.update_stratified_wh_temps(draw, timestep_sec) 
         #integrate the state-space system
         for n in range(n_nodes):
             if n == 0:

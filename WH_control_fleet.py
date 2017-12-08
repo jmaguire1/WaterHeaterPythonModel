@@ -6,6 +6,7 @@ creating and controlling fleet of water heaters
 """
 import numpy as np
 import matplotlib.pyplot as plt
+from annual_ewh_run import WaterHeater
 
 from simple_wh_cwb_4 import ChuckWaterHeater
 import random
