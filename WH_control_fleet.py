@@ -12,7 +12,7 @@ from simple_wh_cwb_4 import ChuckWaterHeater
 import random
 
 def main():
-    numWH = 1000 #number of water heaters in fleet
+    numWH = 100 #number of water heaters in fleet
     RunHours = 10 #num hours in simulation
     lengthRegulation = 900# num of 4-second steps for regulation signal
     TtankInitialMean = 125 #deg F
@@ -141,7 +141,7 @@ def main():
     TotalServiceProvidedPerWHReg = [0 for y in range(numWH)]
     TotalServiceProvidedPerTimeStepReg = [0 for y in range(lengthRegulation)]
     TotalServiceCallsAcceptedPerWHReg = [0 for y in range(numWH)]
-    
+    ttanktemp = [0 for y in range(numWH)]
     
 
     whs = [ChuckWaterHeater(Tamb[1], RHamb[1], Tmains[1], Hot_draw[number,1], fleet_load_request[1], Capacity[number], Type[number], Location[number], 0, MaxServiceCalls[number]) for number in range(numWH)]
@@ -171,7 +171,7 @@ def main():
                 
     #            print('num devices',NumDevicesToCall,'is avail',IsAvailable[n][lastHour],'soc',SoC[n][lastHour])
                 if fleet_load_request[hour][1] < 0 and NumDevicesToCall > 0: #if shed is called for and there are some devices that can respond
-                    newrequest = fleet_load_request_total[hour] / (NumDevicesToCall/(9.5*np.exp(-numWH/20)+1)) #9.5*exp(-numWH/20)+1 ad hoc curve fit based on trying numWH = 20,30,10,200 and doing hand curve fit. NOTE: THIS IS FOR UA = 30, COULD CHANGE IF THIS IS CHANGED
+                    newrequest = fleet_load_request_total[hour] / (NumDevicesToCall/9.5*np.exp(-numWH/20)+1) #9.5*exp(-numWH/20)+1 ad hoc curve fit based on trying numWH = 20,30,10,200 and doing hand curve fit. 
                 elif fleet_load_request[hour][1] > 0 and NumDevicesToCall > 0: # easier to do load add, but some "available" devices still won't be able to respond so ask for extra 
     #                newrequest = fleet_load_request_total[hour] / (NumDevicesToCall/(9.5*np.exp(-numWH/20)+1)) #9.5*exp(-numWH/20)+1 ad hoc curve fit based on trying numWH = 20,30,10,200 and doing hand curve fit. 
                     newrequest = fleet_load_request_total[hour] / (NumDevicesToCall/2)
@@ -201,6 +201,7 @@ def main():
                 
     #            print('provided',eservice)
                 Ttank[number][hour] = ttank
+                ttanktemp[number] = ttank
                 SoC[number][hour] = soC
                 IsAvailable[number][hour] = isAvailable
                 AvailableCapacityAdd[number][hour] = availableCapacityAdd
@@ -218,8 +219,17 @@ def main():
             TotalServiceProvidedPerTimeStep[hour] += servsum #ServiceProvided[number][hour]
 #            print(TsetLast)
         
+        #########################################################################
         if  fleet_load_request[hour][0] == 'regulation':
             
+            if hour == 4:
+                plt.figure(20)
+                plt.clf()
+                plt.hist(ttanktemp)
+                plt.xlabel('Ttank distribution going into regulation')
+                plt.show()
+                
+                
             for step in range(lengthRegulation):
                 NumDevicesToCall = 0
                 servsumReg = 0
@@ -242,7 +252,7 @@ def main():
                 
                 #figure out how much to ask of each device
                 if fleet_regulation_request[step][1] != 0 and NumDevicesToCall > 0: 
-                    newrequest = fleet_regulation_request[step][1] / (NumDevicesToCall/(1.0*np.exp(-numWH/500)+1)) #ad hoc curve fit based on some trial runs and just looking at whatfleet provides vs what is asked
+                    newrequest = fleet_regulation_request[step][1] / NumDevicesToCall #since timestep is small, assume that all devices available last step will be available for this step
                 else:
                     newrequest = fleet_regulation_request[step][1]
                         
@@ -463,6 +473,7 @@ def main():
     plt.plot(ServiceProvidedReg[0][0:50],'r*-',label = 'WH 1')
     plt.plot(ServiceProvidedReg[1][0:50],'bs-',label = 'WH 2')
     plt.plot(ServiceProvidedReg[2][0:50],'k<-',label = 'WH 3')
+    plt.plot(ServiceProvidedReg[3][0:50],'go-',label = 'WH 4')
     plt.ylabel('Service Provided Per WH Per Timestep, W')
     plt.xlabel('Regulation Timestep')
     plt.legend()
@@ -513,27 +524,151 @@ def main():
 
 
 ##############################################################################
-def get_annual_conditions():
+#def get_annual_conditions():
+#        Tamb = []
+#        RHamb = []
+#        Tmains = []
+#        hot_draw = []
+#        
+#        for hour in range(8760):
+#            if hour >  4000:   
+#                Tamb.append(65) # deg F
+#                RHamb.append(30) #%
+#                Tmains.append(55) # deg F
+#            else:
+#                Tamb.append(45) # deg F
+#                RHamb.append(40) #%
+#                Tmains.append(40) # deg F
+#            if hour % 5 == 0: #if hour is divisible by 5
+#                hot_draw.append(0.5) #gpm
+#            else:
+#                hot_draw.append(0)
+#   
+#        return Tamb, RHamb, Tmains, hot_draw
+    
+    
+###############################################################################    
+def get_annual_conditions(self,days_shift,n_br,unit):
+        #reads from 8760 (or 8760 * 60) input files for ambient air temp, RH, mains temp, and draw profile and loads data into arrays for future use
+        #TODO: RH is currently unused, will need to import some psych calculations to get a WB
+        #TODO: Use a .epw weather file? We'll eventually need atmospheric pressure (for psych calcs), could also estimate unconditioned space temp/rh based on ambient or calc mains directly based on weather file info
         Tamb = []
         RHamb = []
         Tmains = []
-        hot_draw = []
+        if self.climate_location != 'denver':
+            raise NameError("Error! Only allowing Denver as a run location for now. Eventually we'll allow different locations and load different files based on the location.")
+        if self.installation_location == 'living':
+            amb_temp_column = 1
+            amb_rh_column = 2
+        elif self.installation_location == 'unfinished basement':
+            amb_temp_column = 3
+            amb_rh_column = 4
+        elif self.installation_location == 'garage':
+            amb_temp_column = 5
+            amb_rh_column = 6
+        elif self.installation_location == 'unifinished attic':
+            amb_temp_column = 7
+            amb_rh_column = 8
+        else:
+            raise NameError("Error! Only allowed installation locations are living, unfinished basement, garage, unfinished attic. Change the installation location to a valid location")
+        mains_temp_column = 9
         
-        for hour in range(8760):
-            if hour >  4000:   
-                Tamb.append(65) # deg F
-                RHamb.append(30) #%
-                Tmains.append(55) # deg F
-            else:
-                Tamb.append(45) # deg F
-                RHamb.append(40) #%
-                Tmains.append(40) # deg F
-            if hour % 5 == 0: #if hour is divisible by 5
-                hot_draw.append(0.5) #gpm
-            else:
-                hot_draw.append(0)
-   
-        return Tamb, RHamb, Tmains, hot_draw
+        linenum = 0
+        
+        ambient_cond_file = open((os.path.join(os.path.dirname(__file__),'data_files','denver_conditions.csv')),'r') #hourly ambient air temperature and RH
+        for line in ambient_cond_file:
+            if linenum > 0: #skip header
+                items = line.strip().split(',')
+                Tamb.append(float(items[amb_temp_column]))
+                RHamb.append(float(items[amb_rh_column]))
+                Tmains.append(float(items[mains_temp_column]))
+            linenum += 1
+        ambient_cond_file.close()
+        
+        #Read in max and average values for the draw profiles
+        #TODO: we only need to do this once when we start running a large number of water heaters, we might want to break this out into somewhere else where we only read this file once while initializing
+        linenum = 0
+        n_beds = 0
+        n_unit = 0
+        
+        #Total gal/day draw numbers based on BA HSP
+        sh_hsp_tot = 14.0 + 4.67 * float(n_br)
+        s_hsp_tot = 12.5 + 4.16 * float(n_br)
+        cw_hsp_tot = 2.35 + 0.78 * float(n_br)
+        dw_hsp_tot = 2.26 + 0.75 * float(n_br)
+        b_hsp_tot = 3.50 + 1.17 * float(n_br)
+        
+        sh_max = np.zeros((5,10))
+        s_max = np.zeros((5,10))
+        b_max = np.zeros((5,10))
+        cw_max = np.zeros((5,10))
+        dw_max = np.zeros((5,10))
+        sh_sum = np.zeros((5,10))
+        s_sum = np.zeros((5,10))
+        b_sum = np.zeros((5,10))
+        cw_sum = np.zeros((5,10))
+        dw_sum = np.zeros((5,10))
+        
+        sum_max_flows_file = open((os.path.join(os.path.dirname(__file__),'data_files', 'DrawProfiles','MinuteDrawProfilesMaxFlows.csv')),'r') #sum and max flows for all units and # of bedrooms
+        for line in sum_max_flows_file:
+            if linenum > 0:
+                items = line.strip().split(',')
+                n_beds = float(items[0]) - 1
+                n_unit = float(items[1])
+                 #column is unit number, row is # of bedrooms. Taken directly from BEopt
+                sh_max[n_beds, n_unit] = float(items[2])
+                s_max[n_beds, n_unit] = float(items[3])
+                b_max[n_beds, n_unit] = float(items[4])
+                cw_max[n_beds, n_unit] = float(items[5])
+                dw_max[n_beds, n_unit] = float(items[6])
+                sh_sum[n_beds, n_unit] = float(items[7])
+                s_sum[n_beds, n_unit] = float(items[8])
+                b_sum[n_beds, n_unit] = float(items[9])
+                cw_sum[n_beds, n_unit] = float(items[10])
+                dw_sum[n_beds, n_unit] = float(items[11])
+            linenum += 1
+        sum_max_flows_file.close()
+        
+        linenum = 0
+        #Read in individual draw profiles
+        yr_min = 60 * 24 * 365
+        hot_draw = np.zeros((yr_min,1))
+        mixed_draw = np.zeros((yr_min,1))
+        #take into account days shifted
+        draw_idx = 60 * 24 * days_shift
+        draw_profile_file = open((os.path.join(os.path.dirname(__file__),'data_files','DrawProfiles','DHWDrawSchedule_{}bed_unit{}_1min_fraction.csv'.format(n_br,unit))),'r') #minutely draw profile (shower, sink, CW, DW, bath)
+        for line in draw_profile_file:
+            if linenum > 0:
+                items = line.strip().split(',')
+                hot_flow = 0
+                mixed_flow = 0
+                if items[0] != '':
+                    sh_draw = float(items[0]) * sh_max[n_br,unit] * (sh_hsp_tot / sh_sum[n_br,unit])
+                    mixed_flow += sh_draw
+                if items[1] != '':
+                    s_draw = float(items[1]) * s_max[n_br,unit] * (s_hsp_tot / s_sum[n_br,unit])
+                    mixed_flow += s_draw
+                if items[2] != '':
+                    cw_draw = float(items[2]) * cw_max[n_br,unit] * (cw_hsp_tot / cw_sum[n_br,unit])
+                    hot_flow += cw_draw
+                if items[3] != '':
+                    dw_draw = float(items[3]) * dw_max[n_br,unit] * (dw_hsp_tot / dw_sum[n_br,unit])
+                    hot_flow += dw_draw
+                if items[4] != '':
+                    b_draw = float(items[4]) * b_max[n_br,unit] * (b_hsp_tot / b_sum[n_br,unit])
+                    mixed_flow += b_draw
+                hot_draw[draw_idx] = hot_flow
+                mixed_draw[draw_idx] = mixed_flow
+            linenum += 1
+            draw_idx += 1
+            if draw_idx >= yr_min:
+                draw_idx = 0
+        draw_profile_file.close()
+        time_draw_profile_completed = time.time()
+        time_load_draw = time_draw_profile_completed - self.initial_time
+        print("Loaded draw profile after {} seconds".format(time_load_draw))
+        
+        return Tamb, RHamb, Tmains, hot_draw, mixed_draw
 # take individual water heater and vary inputs for water draw event schedule,
 # Tambient based on season for conditioned and unconditioned space,
 # setpoint temperature, tank capacity, heat pump vs. electric resistance, if heat pump
