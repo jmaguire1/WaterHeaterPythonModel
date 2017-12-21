@@ -5,16 +5,20 @@ creating and controlling fleet of water heaters
 @author: cbooten
 """
 import numpy as np
+import os
+#import csv
 import matplotlib.pyplot as plt
-from annual_ewh_run import WaterHeater
+#from annual_ewh_run import WaterHeater
 
 from simple_wh_cwb_4 import ChuckWaterHeater
 import random
 
 def main():
-    numWH = 100 #number of water heaters in fleet
-    RunHours = 10 #num hours in simulation
-    lengthRegulation = 900# num of 4-second steps for regulation signal
+    numWH = 20 #number of water heaters in fleet
+    Steps = 20 #num steps in simulation
+    lengthRegulation = 90# num of 4-second steps for regulation signal
+    addshedTimestep = 60 #minutes, NOTE, MUST BE A DIVISOR OF 60. Acceptable numbers are: 1,2,3,4,5,6,10,12,15,20,30, 60
+    MaxNumAnnualConditions = 20 #max # of annual conditions to calculate, if more WHs than this just reuse some of the conditions and water draw profiles
     TtankInitialMean = 125 #deg F
     TtankInitialStddev = 5 #deg F
     TsetInitialMean = 125 #deg F
@@ -27,10 +31,11 @@ def main():
     # for capacity, type and location need to specify discrete values and sample in such a way as to get overall distribution that I want 
     CapacityMasterList = [50,50,50,50,50,50,50,50,40,40,80] #70% 50 gal, 20% 40 gal, 10% 80 gal
     TypeMasterList = ['ER','ER','ER','ER','ER','ER','ER','ER','ER','HP'] #elec_resis 90% and HPWH 10%
-    LocationMasterList =['Conditioned','Conditioned','Conditioned','Conditioned','Unconditioned'] #80% conditioned, 20% unconditioned
-    HotDrawMasterList = [0.2,0.15,0.1, 0.1, 0.05,0.05,0.02,0.01,0.01,0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0]#sample hourly draw pattern. will randomly sample this 
+    LocationMasterList =['living','living','living','living','unfinished basement'] #80% living, 20% unfinished basement for now
+#    HotDrawMasterList = [0.2,0.15,0.1, 0.1, 0.05,0.05,0.02,0.01,0.01,0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0]#sample steply draw pattern. will randomly sample this 
     # 1x for each house and assume pattern is the same for that house for the entire year
     MaxServiceCallMasterList = [100,80,80, 200, 150, 110, 50, 75, 100]
+    
     
         
         
@@ -39,20 +44,22 @@ def main():
     fleet_load_request_total = []
 #    numregs = []
 #    
-    for hour in range(RunHours):
+    ########################################################################
+    #generate load request signal. capacity and regulation
+    for step in range(Steps):
         magnitude_load_add_shed = (7e4 + 2e4*random.random())/(numWH/1) #def magnitude of request for load add/shed, assume only 50% of WH will be able to respond so request "too much" load effectively
-        if hour % 12 == 0 or hour % 12 == 1 or hour % 12 == 2:
-            if hour > 1:
+        if step % 12 == 0 or step % 12 == 1 or step % 12 == 2:
+            if step > 1:
                 service = ['load shed',-magnitude_load_add_shed]
                 s = -magnitude_load_add_shed * numWH / 1
             else:
                 service = ['none',0]
                 s=0
-        elif hour % 7 == 0 or hour % 7 == 1:
+        elif step % 7 == 0 or step % 7 == 1:
             service = ['load add',magnitude_load_add_shed]
             s = magnitude_load_add_shed * numWH / 1
         
-        elif hour == 4: #minutely regulation service
+        elif step == 4: #minutely regulation service. NOTE: THIS IS THE STARTING STEP FOR REGULATION SERVICE
             service = ['regulation',0]
         else:
             service = ['none',0]
@@ -60,7 +67,7 @@ def main():
         
         fleet_load_request_total.append(s)
         fleet_load_request.append(service)
-#        print(fleet_load_request[hour][1])
+        print(fleet_load_request[step][:])
     
 #    #define regulation request separately since timescale is very different, have a 1hr schedule that will be repeated every time it is called
     fleet_regulation_request = []
@@ -79,7 +86,7 @@ def main():
     #print(fleet_request)
 #    print(len(fleet_regulation_request))
     
-#    numsteps = RunHours + numregs*3600 #adds steps for regulation into the time loops later
+#    numsteps = Steps + numregs*3600 #adds steps for regulation into the time loops later
     
    ############################################################################# 
 #    1) generate distribution of initial WH fleet states. this means Ttank, Tset, capacity, location (cond/uncond), type (elec resis or HPWH).
@@ -91,22 +98,76 @@ def main():
     Capacity = [random.choice(CapacityMasterList) for n in range(numWH)]
     Type = [random.choice(TypeMasterList) for n in range(numWH)]
     Location = [random.choice(LocationMasterList) for n in range(numWH)]
-    Hot_draw = np.array([[random.choice(HotDrawMasterList) for h in range(24)] for i in range(numWH)])
+#    Hot_draw = np.array([[random.choice(HotDrawMasterList) for h in range(24)] for i in range(numWH)])
     MaxServiceCalls = [random.choice(MaxServiceCallMasterList) for n in range(numWH)]
+    climate_location = 'Denver' # only climate for now
+    #for calculating annual conditions 
+    
     
 #    print(MaxServiceCalls)
     
-    (Tamb, RHamb, Tmains, hot_draw) = get_annual_conditions()
+#    (Tamb, RHamb, Tmains, hot_draw) = get_annual_conditions()
     
-#    plt.figure(1)
+    
+    #10 different units
+    # bedrooms can be 1-5
+    # gives 50 different draw profiles
+    # can shift profiles by 0-365 days
+    Tamb = []
+    RHamb = []
+    Tmains = []
+#    numAggTimesteps = int(np.ceil(525600 / addshedTimestep))
+    hot_draw =[]
+    mixed_draw = []
+    draw = []
+    for a in range(numWH):             
+        if a <= (MaxNumAnnualConditions-1): #if numWH > MaxNumAnnualConditions just start reusing older conditions to save computational time
+            numbeds = random.randint(1, 5) 
+            shift = random.randint(0, 364)
+            unit = random.randint(0, 9)
+            (tamb, rhamb, tmains, hotdraw, mixeddraw) = get_annual_conditions(climate_location,  Location[a], shift, numbeds, unit, addshedTimestep)
+    #        print('max hot',max(hotdraw),'max mixed',max(mixeddraw))
+    #        print('len tamb',len(tamb),len(tamb[0]),'max Tamb',max(tamb[0]))
+    #        print('len rhamb',len(rhamb),len(rhamb[0]),'max RHamb',max(rhamb[0]))
+    #        print('len tmains',len(tmains),len(tmains[0]),'max Tmains',max(tmains[0]))
+    #        print('len hot',len(hotdraw),len(hotdraw[0]),'max hot_draw',max(hotdraw[0]))
+    #        print('len mixeddraw',len(mixeddraw),len(mixeddraw[0]),'max mixed_draw',max(mixeddraw[0]))
+    
+            Tamb.append(tamb)
+            RHamb.append(rhamb)
+            Tmains.append(tmains)
+            hot_draw.append(hotdraw)
+            mixed_draw.append(mixeddraw)
+            draw.append(hotdraw + 0.3 * mixeddraw)#0.5 is so you don't need to know the exact hot/cold mixture for mixed draws, just assume 1/2 is hot and 1/2 is cold
+        else: #start re-using conditions
+            Tamb.append(Tamb[a-MaxNumAnnualConditions][:])
+            RHamb.append(RHamb[a-MaxNumAnnualConditions][:])
+            Tmains.append(Tmains[a-MaxNumAnnualConditions][:])
+            hot_draw.append(hot_draw[a-MaxNumAnnualConditions][:])
+            mixed_draw.append(mixed_draw[a-MaxNumAnnualConditions][:])
+            draw.append(hot_draw[a-MaxNumAnnualConditions][:] + 0.3 * mixed_draw[a-MaxNumAnnualConditions][:])
+    
+#    print('len draw',len(draw),len(draw[0]),'max draw',max(draw[0]))
+#    print('len hotdraw',len(hot_draw),len(hot_draw[0]),'max hotdraw',max(hot_draw[0]))
+#    print('hotdraw element',hot_draw[1][3])
+#    print('len mixeddraw',len(mixed_draw),len(mixed_draw[0]),'max mixeddraw',max(mixed_draw[0]))
+#    print('len Tamb',len(Tamb),len(Tamb[0]),'max Tamb',max(Tamb[0]))
+#    print(Tamb[0][0:3],Tamb[1][0:3],Tamb[2][0:3],Tamb[3][0:3])
+#    print(max(hot_draw[0]),max(hot_draw[1]),max(hot_draw[2]),max(hot_draw[3]))
+#    print('len RHamb',len(RHamb),len(RHamb[0]),'max RHamb',max(RHamb[0]))
+#    print('len Tmains',len(Tmains),len(Tmains[0]),'max Tmains',max(Tmains[0]))
+#    print('len hot',len(hot_draw),len(hot_draw[0]),'max hot_draw',max(hot_draw[0]))
+#    print('len mixed_draw',len(mixed_draw),len(mixed_draw[0]),'max mixed_draw',max(mixed_draw[0]))
+#    plt.figure(6)
 #    plt.clf()
-#    plt.hist(TsetInitial)  
+#    plt.plot(Tamb[0][0:1000])  
+#    plt.show()
 #    
-#    
-#    plt.figure(2)
+#    plt.figure(6)
 #    plt.clf()
-#    plt.plot(Hot_draw[4,:])
-#    
+#    plt.plot(hot_draw[2][:])
+#    plt.show()
+    
 #    print(Location[1:100])
     
     ###########################################################################    
@@ -118,22 +179,24 @@ def main():
     #5) add the load and regulation requests to get a single request
     #6) apply request down the ranked list until is satisfied
     
-    Tset = [[0 for x in range(RunHours)] for y in range(numWH)]
-    Ttank = [[0 for x in range(RunHours)] for y in range(numWH)]
-    SoC = [[0 for x in range(RunHours)] for y in range(numWH)]
-    AvailableCapacityAdd = [[0 for x in range(RunHours)] for y in range(numWH)]
-    AvailableCapacityShed = [[0 for x in range(RunHours)] for y in range(numWH)]
-    ServiceCallsAccepted = [[0 for x in range(RunHours)] for y in range(numWH)]
-    ServiceProvided = [[0 for x in range(RunHours)] for y in range(numWH)]
-    IsAvailable = [[0 for x in range(RunHours)] for y in range(numWH)]
+    Tset = [[0 for x in range(Steps)] for y in range(numWH)]
+    Ttank = [[0 for x in range(Steps)] for y in range(numWH)]
+    SoC = [[0 for x in range(Steps)] for y in range(numWH)]
+    AvailableCapacityAdd = [[0 for x in range(Steps)] for y in range(numWH)]
+    AvailableCapacityShed = [[0 for x in range(Steps)] for y in range(numWH)]
+    ServiceCallsAccepted = [[0 for x in range(Steps)] for y in range(numWH)]
+    ServiceProvided = [[0 for x in range(Steps)] for y in range(numWH)]
+    IsAvailable = [[0 for x in range(Steps)] for y in range(numWH)]
+    elementOn = [[0 for x in range(Steps)] for y in range(numWH)]
     TotalServiceProvidedPerWH = [0 for y in range(numWH)]
-    TotalServiceProvidedPerTimeStep = [0 for y in range(RunHours)]
+    TotalServiceProvidedPerTimeStep = [0 for y in range(Steps)]
     TotalServiceCallsAcceptedPerWH = [0 for y in range(numWH)]
 #    TotalServiceProvided = [0 for y in range(numWH)]
     #items ending in "Reg" are only for timesteps where regulation is requested 
     TtankReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)]
     SoCReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)]
     IsAvailableReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)]
+    elementOnReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)]
     AvailableCapacityAddReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)] 
     AvailableCapacityShedReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)] 
     ServiceCallsAcceptedReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)] 
@@ -141,216 +204,229 @@ def main():
     TotalServiceProvidedPerWHReg = [0 for y in range(numWH)]
     TotalServiceProvidedPerTimeStepReg = [0 for y in range(lengthRegulation)]
     TotalServiceCallsAcceptedPerWHReg = [0 for y in range(numWH)]
-    ttanktemp = [0 for y in range(numWH)]
-    
+#    ttanktemp = [0 for y in range(numWH)]
+#    TtankLast = [0 for y in range(numWH)]
 
-    whs = [ChuckWaterHeater(Tamb[1], RHamb[1], Tmains[1], Hot_draw[number,1], fleet_load_request[1], Capacity[number], Type[number], Location[number], 0, MaxServiceCalls[number]) for number in range(numWH)]
+    whs = [ChuckWaterHeater(Tamb[0], RHamb[0], Tmains[0], 0, fleet_load_request[0], Capacity[number], Type[number], Location[number], 0, MaxServiceCalls[number]) for number in range(numWH)]
                
-    for hour in range(RunHours):    
+    for step in range(Steps):    
         number = 0
         servsum = 0
 #        capsum = 0
         request = 0
         NumDevicesToCall = 0
-        lastHour = hour - 1
-        HourOfDay = hour % 24
-        if fleet_load_request[hour][0] != 'regulation':
-#            print(fleet_load_request[hour])
-            #decision making about which WH to call on for service, check if available at last hour, if so then 
+        laststep = step - 1
+#        stepOfDay = step % 24
+        if fleet_load_request[step][0] != 'regulation': #not providing regulation
+#            print(fleet_load_request[step])
+            #decision making about which WH to call on for service, check if available at last step, if so then 
             # check for SoC > X%, whatever number that is, divide the total needed and ask for that for each
             
-            if hour > 0:
+            if step > 0:
                 for n in range(numWH):
-                    if fleet_load_request[hour][0] == 'load add' and IsAvailable[n][lastHour] > 0 and SoC[n][lastHour] < maxSOC and AvailableCapacityAdd[n][lastHour] > minCapacityAdd:
+                    if fleet_load_request[step][0] == 'load add' and IsAvailable[n][laststep] > 0 and SoC[n][laststep] < maxSOC and AvailableCapacityAdd[n][laststep] > minCapacityAdd:
                         NumDevicesToCall += 1
     #                    print('ask add')
-                    elif fleet_load_request[hour][0] == 'load shed' and IsAvailable[n][lastHour] > 0 and SoC[n][lastHour] > minSOC and AvailableCapacityShed[n][lastHour] > minCapacityShed:
+                    elif fleet_load_request[step][0] == 'load shed' and IsAvailable[n][laststep] > 0 and SoC[n][laststep] > minSOC and AvailableCapacityShed[n][laststep] > minCapacityShed:
                         NumDevicesToCall += 1
     #                    print('ask shed')
           
                 
-    #            print('num devices',NumDevicesToCall,'is avail',IsAvailable[n][lastHour],'soc',SoC[n][lastHour])
-                if fleet_load_request[hour][1] < 0 and NumDevicesToCall > 0: #if shed is called for and there are some devices that can respond
-                    newrequest = fleet_load_request_total[hour] / (NumDevicesToCall/9.5*np.exp(-numWH/20)+1) #9.5*exp(-numWH/20)+1 ad hoc curve fit based on trying numWH = 20,30,10,200 and doing hand curve fit. 
-                elif fleet_load_request[hour][1] > 0 and NumDevicesToCall > 0: # easier to do load add, but some "available" devices still won't be able to respond so ask for extra 
-    #                newrequest = fleet_load_request_total[hour] / (NumDevicesToCall/(9.5*np.exp(-numWH/20)+1)) #9.5*exp(-numWH/20)+1 ad hoc curve fit based on trying numWH = 20,30,10,200 and doing hand curve fit. 
-                    newrequest = fleet_load_request_total[hour] / (NumDevicesToCall/2)
+    #            print('num devices',NumDevicesToCall,'is avail',IsAvailable[n][laststep],'soc',SoC[n][laststep])
+                if fleet_load_request[step][1] < 0 and NumDevicesToCall > 0: #if shed is called for and there are some devices that can respond
+                    newrequest = fleet_load_request_total[step] / (NumDevicesToCall/9.5*np.exp(-numWH/20)+1) #9.5*exp(-numWH/20)+1 ad hoc curve fit based on trying numWH = 20,30,10,200 and doing hand curve fit. 
+                elif fleet_load_request[step][1] > 0 and NumDevicesToCall > 0: # easier to do load add, but some "available" devices still won't be able to respond so ask for extra 
+    #                newrequest = fleet_load_request_total[step] / (NumDevicesToCall/(9.5*np.exp(-numWH/20)+1)) #9.5*exp(-numWH/20)+1 ad hoc curve fit based on trying numWH = 20,30,10,200 and doing hand curve fit. 
+                    newrequest = fleet_load_request_total[step] / (NumDevicesToCall/2)
                 else:
-                    newrequest = fleet_load_request_total[hour]
+                    newrequest = fleet_load_request_total[step]
                     
-                fleet_load_request[hour] = [fleet_load_request[hour][0],newrequest]
-#                print(fleet_load_request[hour])
+                fleet_load_request[step] = [fleet_load_request[step][0],newrequest]
+#                print('request',fleet_load_request[step])
         
         
         
             for wh in whs: #numWH
-                if hour == 0:
-                    ttank, tset, soC, availableCapacityAdd, availableCapacityShed, serviceCallsAccepted, eservice, isAvailable = wh.execute(TtankInitial[number], TsetInitial[number], Tamb[0], RHamb[0], Tmains[0], Hot_draw[number,0], fleet_load_request[0], 0)
+                if step == 0:
+                    ttank, tset, soC, availableCapacityAdd, availableCapacityShed, serviceCallsAccepted, eservice, isAvailable, elementon = wh.execute(TtankInitial[number], TsetInitial[number], Tamb[number][0], RHamb[number][0], Tmains[number][0], draw[number][0], fleet_load_request[0], ServiceCallsAccepted[number][0], elementOn[number][0], addshedTimestep)
     #                print('WH num',number,'tank',ttank,'soc',soC,'calls accepted', serviceCallsAccepted,'available?',isAvailable,'request',fleet_load_request[0])
+#                    TtankLast= ttank[0] 
+#                    print('tankinitial',TtankInitial[number])
+#                    print('tanklast',ttank)
+#                    print('step',step,'number',number)
                 else:
                     
-                    TsetLast = Tset[number][lastHour]
-                    TtankLast = Ttank[number][lastHour]
-    #                print(TtankLast)
-#                    print(TsetLast)
+                    TsetLast = Tset[number][laststep]
+                    TtankLast = Ttank[number][laststep]
+#                    print('tanklast',TtankLast)
+#                    print('setlast',TsetLast)
+#                    print('num',number,'lasthr',laststep)
+#                    print('numWH',len(Ttank),'steps',len(Ttank[0]))
+#                    print('ttank',Ttank[number][laststep])
                     
-                    ttank, tset, soC, availableCapacityAdd, availableCapacityShed, serviceCallsAccepted, eservice, isAvailable = wh.execute(TtankLast, TsetLast, Tamb[hour], RHamb[hour], Tmains[hour], Hot_draw[number,HourOfDay], fleet_load_request[hour],  ServiceCallsAccepted[number][lastHour])
-    #                print('WH num',number,'tank',ttank,'soc',soC,'calls accepted', serviceCallsAccepted,'available?',isAvailable,'request',fleet_load_request[hour])
-    #                print('request',fleet_load_request[hour],'service',eservice)
-                Tset[number][hour] = tset
+                    ttank, tset, soC, availableCapacityAdd, availableCapacityShed, serviceCallsAccepted, eservice, isAvailable, elementon = wh.execute(TtankLast, TsetLast, Tamb[number][step], RHamb[number][step], Tmains[number][step], draw[number][step], fleet_load_request[step], ServiceCallsAccepted[number][laststep], elementOn[number][laststep], addshedTimestep)
+    #                print('WH num',number,'tank',ttank,'soc',soC,'calls accepted', serviceCallsAccepted,'available?',isAvailable,'request',fleet_load_request[step])
+    #                print('request',fleet_load_request[step],'service',eservice)
+                Tset[number][step] = tset
                 
     #            print('provided',eservice)
-                Ttank[number][hour] = ttank
-                ttanktemp[number] = ttank
-                SoC[number][hour] = soC
-                IsAvailable[number][hour] = isAvailable
-                AvailableCapacityAdd[number][hour] = availableCapacityAdd
-                AvailableCapacityShed[number][hour] = availableCapacityShed
+                Ttank[number][step] = ttank
+#                print('ttank',ttank)
+#                ttanktemp[number] = ttank
+#                TtankLast = ttank
+                SoC[number][step] = soC
+                IsAvailable[number][step] = isAvailable
+                elementOn[number][step] = elementon
+                AvailableCapacityAdd[number][step] = availableCapacityAdd
+                AvailableCapacityShed[number][step] = availableCapacityShed
     #            capsum += availableCapacity
-                ServiceCallsAccepted[number][hour] = serviceCallsAccepted
-                ServiceProvided[number][hour] = eservice
+                ServiceCallsAccepted[number][step] = serviceCallsAccepted
+                ServiceProvided[number][step] = eservice
                 servsum += eservice
-                TotalServiceProvidedPerWH[number] = TotalServiceProvidedPerWH[number] + ServiceProvided[number][hour]
-    #            print('number',number,'hr',hour,TotalServiceProvidedPerWH)
-    #            print('provided per hr',servsum)
-                request += fleet_load_request[hour][1] 
-                number += 1
                 
-            TotalServiceProvidedPerTimeStep[hour] += servsum #ServiceProvided[number][hour]
+                TotalServiceProvidedPerWH[number] = TotalServiceProvidedPerWH[number] + ServiceProvided[number][step]
+    #            print('number',number,'hr',step,TotalServiceProvidedPerWH)
+    #            print('provided per hr',servsum)
+                request += fleet_load_request[step][1] 
+                number += 1
+#            print('step',step,'provided per hr',servsum)    
+            TotalServiceProvidedPerTimeStep[step] += servsum #ServiceProvided[number][step]
 #            print(TsetLast)
         
         #########################################################################
-        if  fleet_load_request[hour][0] == 'regulation':
+        if  fleet_load_request[step][0] == 'regulation':
             
-            if hour == 4:
-                plt.figure(20)
-                plt.clf()
-                plt.hist(ttanktemp)
-                plt.xlabel('Ttank distribution going into regulation')
-                plt.show()
+#            if step == 4:
+#                plt.figure(20)
+#                plt.clf()
+#                plt.hist(ttanktemp)
+#                plt.xlabel('Ttank distribution going into regulation')
+#                plt.show()
                 
                 
-            for step in range(lengthRegulation):
+            for reg_step in range(lengthRegulation):
                 NumDevicesToCall = 0
                 servsumReg = 0
-                #assume this won't be called unless hour > 0
+                #assume this won't be called unless step > 0
                 number = 0 #need to reset since i'll be looping through a different timestep
-                if step == 0:
-                    lastStep = lastHour
+                if reg_step == 0:
+                    lastStep = laststep
                     #figure how many devices to call for the regulation service
                     for n in range(numWH):
                         if IsAvailable[n][lastStep] > 0 and SoC[n][lastStep] > minSOC and SoC[n][lastStep] < maxSOC: #don't specify min capacity to be available for regulation
                             NumDevicesToCall += 1
                 else:
-                    lastStep = step -1
+                    lastStep = reg_step -1
                     #figure how many devices to call for the regulation service
+                    n = 0
                     for n in range(numWH):
+                        
                         if IsAvailableReg[n][lastStep] > 0 and SoCReg[n][lastStep] > minSOC and SoCReg[n][lastStep] < maxSOC: #don't specify min capacity to be available for regulation
                             NumDevicesToCall += 1
                     
                 
                 
                 #figure out how much to ask of each device
-                if fleet_regulation_request[step][1] != 0 and NumDevicesToCall > 0: 
-                    newrequest = fleet_regulation_request[step][1] / NumDevicesToCall #since timestep is small, assume that all devices available last step will be available for this step
+                if fleet_regulation_request[reg_step][1] != 0 and NumDevicesToCall > 0: 
+                    newrequest = fleet_regulation_request[reg_step][1] / NumDevicesToCall #since timestep is small, assume that all devices available last step will be available for this step
                 else:
-                    newrequest = fleet_regulation_request[step][1]
+                    newrequest = fleet_regulation_request[reg_step][1]
                         
-                fleet_regulation_request[step] = [fleet_regulation_request[step][0],newrequest]
+                fleet_regulation_request[reg_step] = [fleet_regulation_request[reg_step][0],newrequest]
 #                print(fleet_regulation_request[step])
                 
-                for wh in whs: #numWH, assume won't be called unless hour > 0        
-#                    TsetLast = Tset[number][llastStepastHour]# dont' change during regulation
-                    if step == 0:
+                for wh in whs: #numWH, assume won't be called unless step > 0        
+#                    TsetLast = Tset[number][llastStepaststep]# dont' change during regulation
+                    if reg_step == 0:
                         TtankLast = Ttank[number][lastStep]
                     else:
                         TtankLast = TtankReg[number][lastStep]
-#                    print(TtankLast, 'num',number,'step',step)
-    
-                    ttank, tset, soC, availableCapacityAdd, availableCapacityShed, serviceCallsAccepted, eservice, isAvailable = wh.execute(TtankLast, TsetLast, Tamb[hour], RHamb[hour], Tmains[hour], Hot_draw[number,HourOfDay], fleet_regulation_request[step],  ServiceCallsAcceptedReg[number][lastStep])
-    #                print('WH num',number,'tank',ttank,'soc',soC,'calls accepted', serviceCallsAccepted,'available?',isAvailable,'request',fleet_load_request[hour])
-    #                print('request',fleet_load_request[hour],'service',eservice)
-#                    Tset[number][hour] = tset
-        #            print('provided',eservice)
-                    TtankReg[number][step] = ttank
-                    SoCReg[number][step] = soC
-                    IsAvailableReg[number][step] = isAvailable
-                    AvailableCapacityAddReg[number][step] = availableCapacityAdd
-                    AvailableCapacityShedReg[number][step] = availableCapacityShed
-                    ServiceCallsAcceptedReg[number][step] = serviceCallsAccepted
-                    ServiceProvidedReg[number][step] = eservice
+#                    print('TtankLast',TtankLast, 'num',number,'step',step)
+#                    print('hotdraw',hot_draw[number][stepOfDay])
+#                   
+#                    print('Tamb',Tamb[number][step],'num',number,'hr',step,'step',step)
+                    ttank, tset, soC, availableCapacityAdd, availableCapacityShed, serviceCallsAccepted, eservice, isAvailable, elementon = wh.execute(TtankLast, TsetLast, Tamb[number][step], RHamb[number][step], Tmains[number][step], draw[number][step], fleet_regulation_request[reg_step], ServiceCallsAcceptedReg[number][lastStep], elementOnReg[number][lastStep], addshedTimestep)
+    #                print('WH num',number,'tank',ttank,'soc',soC,'calls accepted', serviceCallsAccepted,'available?',isAvailable,'request',fleet_load_request[step])
+    #                print('request',fleet_load_request[step],'service',eservice)
+#                    Tset[number][step] = tset
+#                    print('provided',eservice)
+                    TtankReg[number][reg_step] = ttank
+                    SoCReg[number][reg_step] = soC
+#                    print('soc',soC)
+                    IsAvailableReg[number][reg_step] = isAvailable
+                    elementOnReg[number][reg_step] = elementon
+                    AvailableCapacityAddReg[number][reg_step] = availableCapacityAdd
+                    AvailableCapacityShedReg[number][reg_step] = availableCapacityShed
+                    ServiceCallsAcceptedReg[number][reg_step] = serviceCallsAccepted
+                    ServiceProvidedReg[number][reg_step] = eservice
                     servsumReg += eservice
-                    TotalServiceProvidedPerWHReg[number] = TotalServiceProvidedPerWHReg[number] + ServiceProvidedReg[number][step]
+                    TotalServiceProvidedPerWHReg[number] = TotalServiceProvidedPerWHReg[number] + ServiceProvidedReg[number][reg_step]
 #                    print(ServiceProvidedReg[number][step])
 #                    print(TotalServiceProvidedPerWHReg[number])
 #                    print(eservice)
-                    if step == lengthRegulation: # save variables to change back to hourly
-                        Ttank[number][hour] = ttank
-                        SoC[number][hour] = soC
-                        IsAvailable[number][hour] = isAvailable
-                        AvailableCapacityAdd[number][hour] = availableCapacityAdd
-                        AvailableCapacityShed[number][hour] = availableCapacityShed
-                        ServiceCallsAccepted[number][hour] = serviceCallsAccepted
-                        ServiceProvided[number][hour] = eservice
+                    if reg_step == lengthRegulation-1: # save variables to change back to steply
+#                        print('step',step)
+                        Ttank[number][step] = ttank
+                        SoC[number][step] = soC
+                        IsAvailable[number][step] = isAvailable
+                        elementOn[number][step] = elementon
+                        AvailableCapacityAdd[number][step] = availableCapacityAdd
+                        AvailableCapacityShed[number][step] = availableCapacityShed
+                        ServiceCallsAccepted[number][step] = ServiceCallsAccepted[number][laststep] # don't count regulation as service calls, if want to add this then substitute 'serviceCallsAccepted' for what is here
+                        ServiceProvided[number][step] = eservice
                         servsum += eservice
-                        TotalServiceProvidedPerWH[number] = TotalServiceProvidedPerWH[number] + ServiceProvided[number][hour]
-        #            print('number',number,'hr',hour,TotalServiceProvidedPerWH)
-        #            print('provided per hr',servsum) 
+                        TotalServiceProvidedPerWH[number] = TotalServiceProvidedPerWH[number] + ServiceProvided[number][step]
+        #            print('number',number,'hr',step,TotalServiceProvidedPerWH)
+#                        print('number',number, 'provided per hr',servsum) 
                     number += 1
-                TotalServiceProvidedPerTimeStepReg[step] += servsumReg
+                TotalServiceProvidedPerTimeStepReg[reg_step] += servsumReg
 #                print(TtankReg[number][step])
-                    
-                TotalServiceProvidedPerTimeStep[hour] += servsum #update for the next hour when no longer in regulation mode
+#                print('step',step)    
+                TotalServiceProvidedPerTimeStep[step] += servsum #update for the next step when no longer in regulation mode
                 
                 for n in range(number):
-                    TotalServiceCallsAcceptedPerWHReg[n] = ServiceCallsAcceptedReg[n][step]
+                    TotalServiceCallsAcceptedPerWHReg[n] = ServiceCallsAcceptedReg[n][reg_step]
             
             
 #    print('ttank',Ttank[0:20][1])
 #    print(number)
-#        print('hr',hour,'provided',TotalServiceProvidedPerTimeStep[hour],'request',request,'available',capsum)
-#            print(Ttank[number][hour])
+#        print('hr',step,'provided',TotalServiceProvidedPerTimeStep[step],'request',request,'available',capsum)
+#            print(Ttank[number][step])
             
 #    print(ServiceCallsAccepted)
 #    print(TotalServiceProvidedPerTimeStep)
     
     for n in range(number):
-        TotalServiceCallsAcceptedPerWH[n] = ServiceCallsAccepted[n][hour]
-#        TotalServiceProvided[n] = ServiceProvided[n][hour]
-#        print(ServiceProvided[n][hour])
+        TotalServiceCallsAcceptedPerWH[n] = ServiceCallsAccepted[n][step]
+#        TotalServiceProvided[n] = ServiceProvided[n][step]
+#        print(ServiceProvided[n][step])
         #analysis   
 #        for wh in whs:
 #            wh_thistory[wh,:] = np.array(wh.temp_history)  
             
-                
-#    print(Ttank[0][0:2])
-       
-    
-    
-    
-#    wh = ChuckWaterHeater(control_signal=control)
-#    Ttank, Eused, Eloss, ElementOn, Eservice = wh.execute_year()
-    # print(Ttank[1:50], Eused[1:50], Eloss[1:50], control[1:50])
     
 #    print(len(Ttank[0][:]))
     plt.figure(1)
     plt.clf()
-    plt.plot(Ttank[0][0:20],'r*-',label = 'WH 1')
-    plt.plot(Ttank[1][0:20],'bs-',label = 'WH 2')
-    plt.plot(Ttank[2][0:20],'k<-',label = 'WH 3')
-    plt.ylabel('Tank Temperature deg F')
-    plt.xlabel('Hour')
+    plt.plot(draw[0][0:20],'r*-',label = 'WH 1')
+    plt.plot(draw[1][0:20],'bs-',label = 'WH 2')
+    plt.plot(draw[2][0:20],'k<-',label = 'WH 3')
+    plt.ylabel('Water Draw [gal]')
+    plt.xlabel('step')
     plt.legend()
-    plt.ylim([0,170])
+    plt.ylim([0,30])
     
     plt.figure(2)
     plt.clf()
-    plt.plot(SoC[0][0:50],'r*-',label = 'WH 1')
-    plt.plot(SoC[1][0:50],'bs-',label = 'WH 2')
-    plt.plot(SoC[2][0:50],'k<-',label = 'WH 3')
-    plt.ylabel('SoC')
-    plt.xlabel('Hour')
-    plt.ylim([-0.5,1.2])
+    plt.plot(Ttank[0][0:50],'r*-',label = 'WH 1')
+    plt.plot(Ttank[1][0:50],'bs-',label = 'WH 2')
+    plt.plot(Ttank[2][0:50],'k<-',label = 'WH 3')
+#    plt.plot(hot_draw[0][0:50],'r*--',label = 'WH 1')
+#    plt.plot(hot_draw[1][0:50],'bs--',label = 'WH 2')
+#    plt.plot(hot_draw[2][0:50],'k<--',label = 'WH 3')
+    plt.ylabel('Ttank')
+    plt.xlabel('step')
+    plt.ylim([0,170])
     plt.legend()
     plt.show()
     
@@ -359,8 +435,8 @@ def main():
     plt.plot(ServiceCallsAccepted[0][0:20],'r*-',label = 'WH 1')
     plt.plot(ServiceCallsAccepted[1][0:20],'bs-',label = 'WH 2')
     plt.plot(ServiceCallsAccepted[2][0:20],'k<-',label = 'WH 3')
-    plt.ylabel('Service Calls Accepted')
-    plt.xlabel('Hour')
+    plt.ylabel('Service Calls Accepted - Not Inc. Regulation')
+    plt.xlabel('step')
     plt.legend()
     plt.show()
 
@@ -370,7 +446,7 @@ def main():
     plt.plot(ServiceProvided[1][0:50],'bs-',label = 'WH 2')
     plt.plot(ServiceProvided[2][0:50],'k<-',label = 'WH 3')
     plt.ylabel('Service Provided Per WH Per Timestep, W')
-    plt.xlabel('Hour')
+    plt.xlabel('step')
     plt.legend()
     plt.show()
     
@@ -380,7 +456,7 @@ def main():
     plt.plot(TotalServiceProvidedPerTimeStep[0:20],'r*-',label='Provided by Fleet')
     plt.plot(fleet_load_request_total[0:20],'bs-', label ='Requested')
     plt.ylabel('Total Service During Timestep, W')
-    plt.xlabel('Hour')
+    plt.xlabel('step')
     plt.legend()
     plt.show()
     
@@ -420,7 +496,7 @@ def main():
     plt.plot(AvailableCapacityAdd[1][0:20],'bs-',label='1')
     plt.plot(AvailableCapacityAdd[2][0:20],'k<-',label='2')
     plt.ylabel('Available Capacity for Load Add, W-hr')
-    plt.xlabel('Hour')
+    plt.xlabel('step')
     plt.legend()
     plt.show()
     
@@ -430,7 +506,7 @@ def main():
     plt.plot(AvailableCapacityShed[1][0:20],'bs-',label='1')
     plt.plot(AvailableCapacityShed[2][0:20],'k<-',label='2')
     plt.ylabel('Available Capacity for Load Shed, W-hr')
-    plt.xlabel('Hour')
+    plt.xlabel('step')
     plt.legend()
     plt.show()
     
@@ -530,8 +606,8 @@ def main():
 #        Tmains = []
 #        hot_draw = []
 #        
-#        for hour in range(8760):
-#            if hour >  4000:   
+#        for step in range(8760):
+#            if step >  4000:   
 #                Tamb.append(65) # deg F
 #                RHamb.append(30) #%
 #                Tmains.append(55) # deg F
@@ -539,7 +615,7 @@ def main():
 #                Tamb.append(45) # deg F
 #                RHamb.append(40) #%
 #                Tmains.append(40) # deg F
-#            if hour % 5 == 0: #if hour is divisible by 5
+#            if step % 5 == 0: #if step is divisible by 5
 #                hot_draw.append(0.5) #gpm
 #            else:
 #                hot_draw.append(0)
@@ -548,25 +624,28 @@ def main():
     
     
 ###############################################################################    
-def get_annual_conditions(self,days_shift,n_br,unit):
+# from Jeff Maguire annual_ewh_run.py on December, 11, 2017
+# modifications by CWB, eliminate 'self', eliminated 'initial_time' 
+    
+def get_annual_conditions(climate_location, installation_location, days_shift,n_br,unit,timestep_min):
         #reads from 8760 (or 8760 * 60) input files for ambient air temp, RH, mains temp, and draw profile and loads data into arrays for future use
         #TODO: RH is currently unused, will need to import some psych calculations to get a WB
         #TODO: Use a .epw weather file? We'll eventually need atmospheric pressure (for psych calcs), could also estimate unconditioned space temp/rh based on ambient or calc mains directly based on weather file info
         Tamb = []
         RHamb = []
         Tmains = []
-        if self.climate_location != 'denver':
+        if climate_location != 'Denver':
             raise NameError("Error! Only allowing Denver as a run location for now. Eventually we'll allow different locations and load different files based on the location.")
-        if self.installation_location == 'living':
+        if installation_location == 'living':
             amb_temp_column = 1
             amb_rh_column = 2
-        elif self.installation_location == 'unfinished basement':
+        elif installation_location == 'unfinished basement':
             amb_temp_column = 3
             amb_rh_column = 4
-        elif self.installation_location == 'garage':
+        elif installation_location == 'garage':
             amb_temp_column = 5
             amb_rh_column = 6
-        elif self.installation_location == 'unifinished attic':
+        elif installation_location == 'unifinished attic':
             amb_temp_column = 7
             amb_rh_column = 8
         else:
@@ -575,13 +654,14 @@ def get_annual_conditions(self,days_shift,n_br,unit):
         
         linenum = 0
         
-        ambient_cond_file = open((os.path.join(os.path.dirname(__file__),'data_files','denver_conditions.csv')),'r') #hourly ambient air temperature and RH
+        ambient_cond_file = open((os.path.join(os.path.dirname(__file__),'data_files','denver_conditions.csv')),'r') #steply ambient air temperature and RH
         for line in ambient_cond_file:
             if linenum > 0: #skip header
                 items = line.strip().split(',')
-                Tamb.append(float(items[amb_temp_column]))
-                RHamb.append(float(items[amb_rh_column]))
-                Tmains.append(float(items[mains_temp_column]))
+                for b in range(int(60/timestep_min)): # repeat depending on how many timesteps per step there are.
+                    Tamb.append([float(items[amb_temp_column])])
+                    RHamb.append([float(items[amb_rh_column])])
+                    Tmains.append([float(items[mains_temp_column])])
             linenum += 1
         ambient_cond_file.close()
         
@@ -613,8 +693,8 @@ def get_annual_conditions(self,days_shift,n_br,unit):
         for line in sum_max_flows_file:
             if linenum > 0:
                 items = line.strip().split(',')
-                n_beds = float(items[0]) - 1
-                n_unit = float(items[1])
+                n_beds = int(items[0]) - 1
+                n_unit = int(items[1]) - 1
                  #column is unit number, row is # of bedrooms. Taken directly from BEopt
                 sh_max[n_beds, n_unit] = float(items[2])
                 s_max[n_beds, n_unit] = float(items[3])
@@ -631,68 +711,63 @@ def get_annual_conditions(self,days_shift,n_br,unit):
         
         linenum = 0
         #Read in individual draw profiles
-        yr_min = 60 * 24 * 365
-        hot_draw = np.zeros((yr_min,1))
-        mixed_draw = np.zeros((yr_min,1))
+        steps_per_year = int(np.ceil(60 * 24 * 365 / timestep_min))
+        hot_draw = np.zeros((steps_per_year,1))
+        mixed_draw = np.zeros((steps_per_year,1))
         #take into account days shifted
         draw_idx = 60 * 24 * days_shift
         draw_profile_file = open((os.path.join(os.path.dirname(__file__),'data_files','DrawProfiles','DHWDrawSchedule_{}bed_unit{}_1min_fraction.csv'.format(n_br,unit))),'r') #minutely draw profile (shower, sink, CW, DW, bath)
+        agghotflow = 0.0
+        aggmixflow = 0.0
         for line in draw_profile_file:
+            nbr = n_br - 1 #go back to starting index at zero for python internal calcs
             if linenum > 0:
                 items = line.strip().split(',')
-                hot_flow = 0
-                mixed_flow = 0
+                hot_flow = 0.0
+                mixed_flow = 0.0
+                
                 if items[0] != '':
-                    sh_draw = float(items[0]) * sh_max[n_br,unit] * (sh_hsp_tot / sh_sum[n_br,unit])
+                    sh_draw = float(items[0]) * sh_max[nbr,unit] * (sh_hsp_tot / sh_sum[nbr,unit])
                     mixed_flow += sh_draw
                 if items[1] != '':
-                    s_draw = float(items[1]) * s_max[n_br,unit] * (s_hsp_tot / s_sum[n_br,unit])
+                    s_draw = float(items[1]) * s_max[nbr,unit] * (s_hsp_tot / s_sum[nbr,unit])
                     mixed_flow += s_draw
                 if items[2] != '':
-                    cw_draw = float(items[2]) * cw_max[n_br,unit] * (cw_hsp_tot / cw_sum[n_br,unit])
+                    cw_draw = float(items[2]) * cw_max[nbr,unit] * (cw_hsp_tot / cw_sum[nbr,unit])
                     hot_flow += cw_draw
                 if items[3] != '':
-                    dw_draw = float(items[3]) * dw_max[n_br,unit] * (dw_hsp_tot / dw_sum[n_br,unit])
+                    dw_draw = float(items[3]) * dw_max[nbr,unit] * (dw_hsp_tot / dw_sum[nbr,unit])
                     hot_flow += dw_draw
                 if items[4] != '':
-                    b_draw = float(items[4]) * b_max[n_br,unit] * (b_hsp_tot / b_sum[n_br,unit])
+                    b_draw = float(items[4]) * b_max[nbr,unit] * (b_hsp_tot / b_sum[nbr,unit])
                     mixed_flow += b_draw
-                hot_draw[draw_idx] = hot_flow
-                mixed_draw[draw_idx] = mixed_flow
+#                hot_draw[draw_idx] = hot_flow
+#                mixed_draw[draw_idx] = mixed_flow
+#                print('maxhot',max(hot_draw))
+                agghotflow += hot_flow
+                aggmixflow += mixed_flow
+#                    print('hot',hot_flow,'mixed',mixed_flow)
+                if linenum % timestep_min == 0: #aggregate
+#                    print('hot',agghotflow,'mixed',mixed_flow)
+                    hot_draw[draw_idx] = agghotflow
+                    mixed_draw[draw_idx] = aggmixflow
+                    agghotflow = 0
+                    aggmixflow = 0
+                    draw_idx += 1
             linenum += 1
-            draw_idx += 1
-            if draw_idx >= yr_min:
+            if draw_idx >= steps_per_year:
                 draw_idx = 0
         draw_profile_file.close()
-        time_draw_profile_completed = time.time()
-        time_load_draw = time_draw_profile_completed - self.initial_time
-        print("Loaded draw profile after {} seconds".format(time_load_draw))
+#        time_draw_profile_completed = time.time()
+#        time_load_draw = time_draw_profile_completed - initial_time
+#        print("Loaded draw profile after {} seconds".format(time_load_draw))
         
+#        print('max hot',max(hot_draw),'max mixed',max(mixed_draw))
+#        print('len Tamb',len(Tamb),'len RHamb',len(RHamb),'len Tmains',len(Tmains),'len hot',len(hot_draw),'len mixed',len(mixed_draw))
         return Tamb, RHamb, Tmains, hot_draw, mixed_draw
-# take individual water heater and vary inputs for water draw event schedule,
-# Tambient based on season for conditioned and unconditioned space,
-# setpoint temperature, tank capacity, heat pump vs. electric resistance, if heat pump
-# need a distribution of COP
 
-#will need to add manufacturer control/protection logic to waterHeater model
-# specify max number of grid service responses for various timescales (i.e. 2x per day and 20 times per month for example) 
-# this could be a function of service type. for load shed it could be 1x/day, for regulation might be participate for 30min/day
-# specify multiple levels of load add/shed? maybe unnessary since aggregating devices first?
 
-# will need to assume some sort of control signal/request: regulation, load add, load shed for now. 
-# each device will decide if it can provide the service????? then see if service provided matches up with SoC for fleet???? 
 
-# run N water heaters, then convert to battery equivalent model terminology, need Energy storage capacity and SoC, 
-# elec resistance or HPWH (input into WH model), conditioned or unconditioned space (input into WH model), elec energy used, 
-# thermal energy delivered, tank energy loss, parasitic energy
-
-# fleet storage capacity, Storage_capacity_fleet = sum of individual capacity with Tmax and Tmin defined, m_water_in_tank*heat capacitance*(Tmax-Tmin)
-
-# fleet state of charge, SoC_fleet = (sum of SoC_individual*Capacity_individual) / sum(Capacity_individual)
-
-# Elec Power to end use (i.e. elec power required to deliver hot water) = sum(electrical power input per device)
-
-# fleet parasitic power = sum(tank losses+parasitic elec power) 
 
 if __name__ == '__main__':
     main()
