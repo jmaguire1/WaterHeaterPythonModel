@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Oct 25 10:28:48 2017
-creating and controlling fleet of water heaters
+creating and controlling a fleet of water heaters
 @author: cbooten
 """
+# depending on the IDE used these libraries might need to be imported manually
 import numpy as np
 import os
 import matplotlib.pyplot as plt
