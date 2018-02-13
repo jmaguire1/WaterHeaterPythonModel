@@ -11,14 +11,15 @@ import matplotlib.pyplot as plt
 import random
 
 # this is the actual water heater model
-from draft_wh_1 import WaterHeater
+from draft_wh_1_adv_availability_forecasting import WaterHeater
 
 
 def main():
-    numWH = 20 #number of water heaters in fleet
-    Steps = 20 #num steps in simulation
+    numWH = 300 #number of water heaters to be simulated to represent the entire fleet
+    Fleet_size_represented = max(numWH, 1e5)#size of the fleet that is represented by numWH
+    Steps = 10 #num steps in simulation
     lengthRegulation = 90# num of 4-second steps for regulation signal
-    addshedTimestep = 60 #minutes, NOTE, MUST BE A DIVISOR OF 60. Acceptable numbers are: 1,2,3,4,5,6,10,12,15,20,30, 60
+    addshedTimestep = 10 #minutes, NOTE, MUST BE A DIVISOR OF 60. Acceptable numbers are: 1,2,3,4,5,6,10,12,15,20,30, 60
     MaxNumAnnualConditions = 20 #max # of annual conditions to calculate, if more WHs than this just reuse some of the conditions and water draw profiles
     TtankInitialMean = 125 #deg F
     TtankInitialStddev = 5 #deg F
@@ -44,7 +45,9 @@ def main():
     fleet_load_request_total = []
     
     for step in range(Steps):
-        magnitude_load_add_shed = (7e4 + 2e4*random.random())/(numWH/1) #def magnitude of request for load add/shed
+        capacity_needed = 1e6 + 2e5*random.random()#Watts needed, >0 is capacity add, <0 is capacity shed
+#        Fleet_size_represented = capacity_needed/4500 # approximately how many WH would be needed to be able to provide this capacity
+        magnitude_load_add_shed = capacity_needed/Fleet_size_represented #def magnitude of request for load add/shed
         if step % 12 == 0 or step % 12 == 1 or step % 12 == 2: # this is my aribtrary but not random way of creating load add/shed events. should be replaced with a more realistic signal at some point
             if step > 1:
                 service = ['load shed',-magnitude_load_add_shed]
@@ -56,7 +59,7 @@ def main():
             service = ['load add',magnitude_load_add_shed]
             s = magnitude_load_add_shed * numWH / 1
         
-        elif step == 4: #minutely regulation service. NOTE: THIS IS THE STARTING STEP FOR REGULATION SERVICE
+        elif step == 4000: #minutely regulation service. NOTE: THIS IS THE STARTING STEP FOR REGULATION SERVICE
             service = ['regulation',0]
         else:
             service = ['none',0]
@@ -87,6 +90,7 @@ def main():
     TtankInitial=np.random.normal(TtankInitialMean, TtankInitialStddev,numWH)
     TsetInitial=np.random.normal(TsetInitialMean, TsetInitialStddev,numWH)
     Capacity = [random.choice(CapacityMasterList) for n in range(numWH)]
+    Capacity_fleet_ave = sum(Capacity)/numWH
     Type = [random.choice(TypeMasterList) for n in range(numWH)]
     Location = [random.choice(LocationMasterList) for n in range(numWH)]
     MaxServiceCalls = [random.choice(MaxServiceCallMasterList) for n in range(numWH)]
@@ -117,7 +121,8 @@ def main():
             Tmains.append(tmains)
             hot_draw.append(hotdraw)
             mixed_draw.append(mixeddraw)
-            draw.append(hotdraw + 0.3 * mixeddraw)#0.5 is so you don't need to know the exact hot/cold mixture for mixed draws, just assume 1/2 is hot and 1/2 is cold
+            draw.append(hotdraw + 0.3 * mixeddraw)#0.3 is so you don't need to know the exact hot/cold mixture for mixed draws, just assume 1/2 is hot and 1/2 is cold
+
         else: #start re-using conditions
             Tamb.append(Tamb[a-MaxNumAnnualConditions][:])
             RHamb.append(RHamb[a-MaxNumAnnualConditions][:])
@@ -126,19 +131,33 @@ def main():
             mixed_draw.append(mixed_draw[a-MaxNumAnnualConditions][:])
             draw.append(hot_draw[a-MaxNumAnnualConditions][:] + 0.3 * mixed_draw[a-MaxNumAnnualConditions][:])
 
-    
+
+    draw_fleet = sum(draw)# this sums all rows, where each row is a WH, so gives the fleet sum of hot draw at each step
+    draw_fleet_ave = draw_fleet/numWH  # this averages all rows, where each row is a WH, so gives the fleet average of hot draw at each step
+
+   
+#    plt.figure(19)
+#    plt.clf()
+##    plt.plot(hot_draw_fleet[0:200], 'k<-', label = 'hot')
+#    plt.plot(draw_fleet_ave[0:200], 'ro-',label = 'ave draw')
+#    plt.ylabel('Hot draw fleet [gal/step]')
+#    plt.legend()
+#    plt.xlabel('step')
+
     ###########################################################################  
     
     ##################################     
 #    Initializing lists to be saved to track indivisual water heater performance over each timestep
     Tset = [[0 for x in range(Steps)] for y in range(numWH)]
     Ttank = [[0 for x in range(Steps)] for y in range(numWH)]
+    dTtank_set = [[0 for x in range(Steps)] for y in range(numWH)]
     SoC = [[0 for x in range(Steps)] for y in range(numWH)]
     AvailableCapacityAdd = [[0 for x in range(Steps)] for y in range(numWH)]
     AvailableCapacityShed = [[0 for x in range(Steps)] for y in range(numWH)]
     ServiceCallsAccepted = [[0 for x in range(Steps)] for y in range(numWH)]
     ServiceProvided = [[0 for x in range(Steps)] for y in range(numWH)]
-    IsAvailable = [[0 for x in range(Steps)] for y in range(numWH)]
+    IsAvailableAdd = [[0 for x in range(Steps)] for y in range(numWH)]
+    IsAvailableShed = [[0 for x in range(Steps)] for y in range(numWH)]
     elementOn = [[0 for x in range(Steps)] for y in range(numWH)]
     TotalServiceProvidedPerWH = [0 for y in range(numWH)]
     TotalServiceProvidedPerTimeStep = [0 for y in range(Steps)]
@@ -147,7 +166,8 @@ def main():
     #items ending in "Reg" are only for timesteps where regulation is requested 
     TtankReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)]
     SoCReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)]
-    IsAvailableReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)]
+    IsAvailableAddReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)]
+    IsAvailableShedReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)]
     elementOnReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)]
     AvailableCapacityAddReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)] 
     AvailableCapacityShedReg = [[0 for x in range(lengthRegulation)] for y in range(numWH)] 
@@ -169,7 +189,7 @@ def main():
         NumDevicesToCall = 0
         laststep = step - 1
 
-        if fleet_load_request[step][0] != 'regulation': #not providing regulation
+        if fleet_load_request[step][0] != 'regulation': #NOT providing regulation
 
 #            decision making about which WH to call on for service, check if available at last step, if so then 
 #            check for SoC > minSOC and Soc < maxSOC, whatever number that is, divide the total needed and ask for that for each
@@ -177,36 +197,39 @@ def main():
 #            at the last timestep
             if step > 0:
                 for n in range(numWH):
-                    if fleet_load_request[step][0] == 'load add' and IsAvailable[n][laststep] > 0 and SoC[n][laststep] < maxSOC and AvailableCapacityAdd[n][laststep] > minCapacityAdd:
+                    if fleet_load_request[step][0] == 'load add' and IsAvailableAdd[n][laststep] > 0 and SoC[n][laststep] < maxSOC and AvailableCapacityAdd[n][laststep] > minCapacityAdd:
                         NumDevicesToCall += 1
-                    elif fleet_load_request[step][0] == 'load shed' and IsAvailable[n][laststep] > 0 and SoC[n][laststep] > minSOC and AvailableCapacityShed[n][laststep] > minCapacityShed:
+                    elif fleet_load_request[step][0] == 'load shed' and IsAvailableShed[n][laststep] > 0 and SoC[n][laststep] > minSOC and AvailableCapacityShed[n][laststep] > minCapacityShed:
                         NumDevicesToCall += 1          
-                
-                if fleet_load_request[step][1] < 0 and NumDevicesToCall > 0: #if shed is called for and there are some devices that can respond
-                    newrequest = fleet_load_request_total[step] / (NumDevicesToCall/9.5*np.exp(-numWH/20)+1) #9.5*exp(-numWH/20)+1 ad hoc curve fit based on trying numWH = 20,30,10,200 and doing hand curve fit. 
-                elif fleet_load_request[step][1] > 0 and NumDevicesToCall > 0: 
-                    newrequest = fleet_load_request_total[step] / (NumDevicesToCall/2) # easier to do load add, but some "available" devices still won't be able to respond so ask for 2x what you would expect 
-                else:
-                    newrequest = fleet_load_request_total[step]
+#                print('devices to call',NumDevicesToCall,'request', fleet_load_request[step][0])
+#                if fleet_load_request[step][1] < 0 and NumDevicesToCall > 0: #if shed is called for and there are some devices that can respond
+#                    #first option below includes a fudge factor, second assumes that forecasting in the WH model for availability for the next timestep given aggregator-provided forecast water draws is accurate enough
+#                    newrequest = fleet_load_request_total[step] / (NumDevicesToCall/9.5*np.exp(-numWH/20)+1) #9.5*exp(-numWH/20)+1 ad hoc curve fit based on trying numWH = 20,30,10,200 and doing hand curve fit. 
+#                elif fleet_load_request[step][1] > 0 and NumDevicesToCall > 0: 
+#                    newrequest = fleet_load_request_total[step] / (NumDevicesToCall/2) # easier to do load add, but some "available" devices still won't be able to respond so ask for 2x what you would expect 
+#                else:
+#                    newrequest = fleet_load_request_total[step]
                     
-                fleet_load_request[step] = [fleet_load_request[step][0],newrequest]
+                fleet_load_request[step] = [fleet_load_request[step][0],fleet_load_request_total[step] / max(NumDevicesToCall,1)]
         
         
         
             for wh in whs: #loop through water heatesr
                 if step == 0:
-                    ttank, tset, soC, availableCapacityAdd, availableCapacityShed, serviceCallsAccepted, eservice, isAvailable, elementon = wh.execute(TtankInitial[number], TsetInitial[number], Tamb[number][0], RHamb[number][0], Tmains[number][0], draw[number][0], fleet_load_request[0], ServiceCallsAccepted[number][0], elementOn[number][0], addshedTimestep)
+                    ttank, tset, soC, availableCapacityAdd, availableCapacityShed, serviceCallsAccepted, eservice, isAvailableAdd, isAvailableShed, elementon = wh.execute(TtankInitial[number], TsetInitial[number], Tamb[number][0], RHamb[number][0], Tmains[number][0], draw[number][0], fleet_load_request[0], ServiceCallsAccepted[number][0], elementOn[number][0], addshedTimestep, draw_fleet_ave[0])
                 else:
                     
                     TsetLast = Tset[number][laststep]
                     TtankLast = Ttank[number][laststep]                    
-                    ttank, tset, soC, availableCapacityAdd, availableCapacityShed, serviceCallsAccepted, eservice, isAvailable, elementon = wh.execute(TtankLast, TsetLast, Tamb[number][step], RHamb[number][step], Tmains[number][step], draw[number][step], fleet_load_request[step], ServiceCallsAccepted[number][laststep], elementOn[number][laststep], addshedTimestep)
+                    ttank, tset, soC, availableCapacityAdd, availableCapacityShed, serviceCallsAccepted, eservice, isAvailableAdd, isAvailableShed , elementon = wh.execute(TtankLast, TsetLast, Tamb[number][step], RHamb[number][step], Tmains[number][step], draw[number][step], fleet_load_request[step], ServiceCallsAccepted[number][laststep], elementOn[number][laststep], addshedTimestep, draw_fleet_ave[min([step+1,Steps])]) #min([step+1,Steps]) is to provide a forecast for the average fleet water draw for the next timestep while basically ignoring the last timestep forecast
 
 #                assign returned parameters to associated lists to be recorded
                 Tset[number][step] = tset
                 Ttank[number][step] = ttank
+                dTtank_set [number][step] = ttank - tset
                 SoC[number][step] = soC
-                IsAvailable[number][step] = isAvailable
+                IsAvailableAdd[number][step] = isAvailableAdd
+                IsAvailableShed[number][step] = isAvailableShed
                 elementOn[number][step] = elementon
                 AvailableCapacityAdd[number][step] = availableCapacityAdd
                 AvailableCapacityShed[number][step] = availableCapacityShed
@@ -232,14 +255,14 @@ def main():
                     lastStep = laststep
                     #figure how many devices to call for the regulation service
                     for n in range(numWH):
-                        if IsAvailable[n][lastStep] > 0 and SoC[n][lastStep] > minSOC and SoC[n][lastStep] < maxSOC: #don't specify min capacity to be available for regulation
+                        if (IsAvailableAdd[n][lastStep] > 0 or IsAvailableShed[n][lastStep] > 0) > 0 and SoC[n][lastStep] > minSOC and SoC[n][lastStep] < maxSOC: #don't specify min capacity to be available for regulation
                             NumDevicesToCall += 1
                 else:
                     lastStep = reg_step -1
                     #figure how many devices to call for the regulation service
                     n = 0
                     for n in range(numWH):
-                        if IsAvailableReg[n][lastStep] > 0 and SoCReg[n][lastStep] > minSOC and SoCReg[n][lastStep] < maxSOC: #don't specify min capacity to be available for regulation
+                        if (IsAvailableAddReg[n][lastStep] > 0 or IsAvailableShedReg[n][lastStep] > 0) > 0 and SoCReg[n][lastStep] > minSOC and SoCReg[n][lastStep] < maxSOC: #don't specify min capacity to be available for regulation
                             NumDevicesToCall += 1
                                 
                 
@@ -258,12 +281,13 @@ def main():
                         TtankLast = TtankReg[number][lastStep]
                     
 #                    call the water heater model
-                    ttank, tset, soC, availableCapacityAdd, availableCapacityShed, serviceCallsAccepted, eservice, isAvailable, elementon = wh.execute(TtankLast, TsetLast, Tamb[number][step], RHamb[number][step], Tmains[number][step], draw[number][step], fleet_regulation_request[reg_step], ServiceCallsAcceptedReg[number][lastStep], elementOnReg[number][lastStep], addshedTimestep)
+                    ttank, tset, soC, availableCapacityAdd, availableCapacityShed, serviceCallsAccepted, eservice, isAvailableAdd, isAvailableShed, elementon = wh.execute(TtankLast, TsetLast, Tamb[number][step], RHamb[number][step], Tmains[number][step], draw[number][step], fleet_regulation_request[reg_step], ServiceCallsAcceptedReg[number][lastStep], elementOnReg[number][lastStep], addshedTimestep, draw_fleet_ave[min([step+1,Steps])])
 
 #                    save outputs in lists
                     TtankReg[number][reg_step] = ttank
                     SoCReg[number][reg_step] = soC
-                    IsAvailableReg[number][reg_step] = isAvailable
+                    IsAvailableAddReg[number][reg_step] = isAvailableAdd
+                    IsAvailableShedReg[number][reg_step] = isAvailableShed
                     elementOnReg[number][reg_step] = elementon
                     AvailableCapacityAddReg[number][reg_step] = availableCapacityAdd
                     AvailableCapacityShedReg[number][reg_step] = availableCapacityShed
@@ -370,6 +394,24 @@ def main():
     plt.ylabel('Available Capacity for Load Shed, W-hr')
     plt.xlabel('step')
     plt.legend()
+    plt.show()
+    
+    plt.figure(19)
+    plt.clf()
+    plt.hist(TtankInitial)
+    plt.xlabel('Tank Temperature Initial [deg F]')
+    plt.show()
+    
+    plt.figure(20)
+    plt.clf()
+    plt.hist(TsetInitial)
+    plt.xlabel('Tank Setpoint Temperature Initial [deg F]')
+    plt.show()
+    
+    plt.figure(21)
+    plt.clf()
+    plt.hist(Capacity)
+    plt.xlabel('Tank Capacity [gal]')
     plt.show()
     
     

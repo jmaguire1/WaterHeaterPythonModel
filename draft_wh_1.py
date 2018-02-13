@@ -2,7 +2,7 @@
 """
 Created on Tue Oct 24 08:38:56 2017
 super simple water heater model
-@author: cbooten
+@author: chuck booten, jeff maguire, xin jin
 """
 
 
