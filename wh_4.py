@@ -32,6 +32,7 @@ class WaterHeater():
         Eloss_ts = self.UA*(Tlast-Tamb_ts)    
         dT_from_hot_draw = (hot_draw_ts)/self.Capacity*(Tlast - Tmains_ts)# hot_draw is in gal for the timestep
         dT_loss = Eloss_ts*timestep*60/(3.79*self.Capacity*4810) #3.79 kg/gal of water, 4810 is J/kgK heat capacity of water, timestep units are minutes
+        Edel_ts = hot_draw_ts * 4180 * 3.79 * (Tlast-Tmains_ts)
         
         if Tlast < Tset - self.Tdeadband:
             Eused_baseline_ts = self.E_heat*1000 #W used

@@ -9,17 +9,33 @@ Example Higher Level Controller
 import random
 #import numpy as np
 #import os
+import datetime
 from fleet_request_2 import FleetRequest
 from WH_fleet_control_6 import WaterHeaterFleet
 
 
 def main():
-    Steps = 9 #num steps in simulation
-    forecast = 0 # 0 is no, 1 is provide a forecast
+    Steps = 10 #num steps in simulation
+    if Steps > 1:
+        forecast = 1
+    else:
+        forecast = 0
     Q_request = 0 # reactive power request, not considering reactive power 
     Timestep = .1 #minutes, NOTE, MUST BE A DIVISOR OF 60. Acceptable numbers are: 0.1, 0.2, 0.5, 1,2,3,4,5,6,10,12,15,20,30, 60, etc.
-    StartTime = 0 # 0-8759, hour of the year to start simulation
-            
+    starttime = 8759 # 0-8759, hour of the year to start simulation
+    startday = (starttime // 24) + 1
+    monthindex = [[1,31],[2,59],[3,90],[4,120],[5,151],[6,181],[7,212],[8,243],[9,273],[10,304],[11,334],[12,365]] #doesn't account for leap years
+    for m in monthindex:
+        if startday <= m[1]:
+            startmonth = m[0]
+            break
+    
+    if startmonth > 1:
+        startday -= monthindex[(m[0]-2)][1]
+
+    starthour = starttime % 24
+    
+    StartTime = datetime.datetime(2018,startmonth,startday,starthour)         
 
     ########################################################################
     #generate load request signal and regulation
@@ -48,7 +64,7 @@ def main():
 ############################################################################
 #        Call fleet
     
-        #creating service request object    
+        #creating service request object
         ServiceRequest = FleetRequest(StartTime, Timestep, P_request, Q_request, Steps, forecast) # ts,dt,Power[T],0.0)
     
         # initializing fleet
@@ -56,7 +72,18 @@ def main():
         
         #calling fleet
         FleetResponse = fleet.ExecuteFleet(ServiceRequest) #
-    
+        
+        print 'P_injected={}'.format(FleetResponse.P_injected)
+        print 'Q_injected={}'.format(FleetResponse.Q_injected)
+        print 'P_service={}'.format(FleetResponse.P_service)
+        print 'Q_service={}'.format(FleetResponse.Q_service)
+        print 'P_injected_max={}'.format(FleetResponse.P_injected_max)
+        print 'P_service_max={}'.format(FleetResponse.P_service_max)
+        print 'Q_service_max={}'.format(FleetResponse.Q_service_max)
+        print 'P_forecast={}'.format(FleetResponse.P_forecast)
+        print 'Q_forecast={}'.format(FleetResponse.Q_forecast)
+        print 'eta_charge={}'.format(FleetResponse.eta_charge)
+        print 'eta_discharge={}'.format(FleetResponse.eta_discharge)
     
 ############################################################################
 #   Plotting load add/shed responses

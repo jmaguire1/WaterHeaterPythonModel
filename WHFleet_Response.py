@@ -30,6 +30,8 @@ class WHFleetResponse:
         self.IsAvailableShed = [[0 for x in range(Steps)] for y in range(numWH)]
         self.elementOn = [[0 for x in range(Steps)] for y in range(numWH)]
         self.TotalServiceProvidedPerTimeStep = [0 for y in range(Steps)]
-        self.P_injected = 0
-        self.P_injected_max = 0
+        self.P_injected = [0 for y in range(Steps)]
+        self.P_injected_max = [0 for y in range(Steps)]
+        self.eta_charge = [0 for y in range(Steps)]
+        self.eta_discharge = [0 for y in range(Steps)]
          

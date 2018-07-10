@@ -20,10 +20,10 @@ class WaterHeaterFleet():
         self.Fleet_size_represented = max(self.numWH, 1e5)#size of the fleet that is represented by self.numWH
 #        addshedTimestep NOTE, MUST BE A DIVISOR OF 60. Acceptable numbers are: 0.1, 0.2, 0.5, 1,2,3,4,5,6,10,12,15,20,30, 60, etc.
         self.MaxNumAnnualConditions = 20 #max # of annual conditions to calculate, if more WHs than this just reuse some of the conditions and water draw profiles
-        self.TtankInitialMean = 125 #deg F
-        self.TtankInitialStddev = 5 #deg F
-        self.TsetInitialMean = 125 #deg F
-        self.TsetInitialStddev = 5 #deg F
+        self.TtankInitialMean = 123 #deg F
+        self.TtankInitialStddev = 9.7 #deg F
+        self.TsetInitialMean = 123 #deg F
+        self.TsetInitialStddev = 9.7 #deg F
         self.minSOC = 0.2 # minimum SoC for aggregator to call for shed service
         self.maxSOC = 0.8 # minimum SoC for aggregator to call for add service
         self.minCapacityAdd = 350 #W-hr, minimum add capacity to be eligible for add service
@@ -82,11 +82,11 @@ class WaterHeaterFleet():
     #            print('len Tamb',len(Tamb[0]))
     
             else: #start re-using conditions
-                Tamb.append(Tamb[a-self.MaxNumAnnualConditions][:])
-                RHamb.append(RHamb[a-self.MaxNumAnnualConditions][:])
-                Tmains.append(Tmains[a-self.MaxNumAnnualConditions][:])
-                hot_draw.append(hot_draw[a-self.MaxNumAnnualConditions][:])
-                mixed_draw.append(mixed_draw[a-self.MaxNumAnnualConditions][:])
+                Tamb.append(Tamb[a % self.MaxNumAnnualConditions][:])
+                RHamb.append(RHamb[a % self.MaxNumAnnualConditions][:])
+                Tmains.append(Tmains[a % self.MaxNumAnnualConditions][:])
+                hot_draw.append(hot_draw[a % self.MaxNumAnnualConditions][:])
+                mixed_draw.append(mixed_draw[a % self.MaxNumAnnualConditions][:])
                 draw.append(hot_draw[a-self.MaxNumAnnualConditions][:] + 0.3 * mixed_draw[a-self.MaxNumAnnualConditions][:])
 #        print('len Tamb',len(Tamb[0]), len(Tamb))
 #        print('len hotdraw',len(hot_draw[0]), len(hot_draw))
@@ -119,6 +119,7 @@ class WaterHeaterFleet():
         
     
     #    Initializing the water heater models
+        #TODO: Should this be Tamb[start_hr] etc?
         whs = [WaterHeater(Tamb[0], RHamb[0], Tmains[0], 0, ServiceRequest.P_request, Capacity[number], Type[number], Location[number], 0, MaxServiceCalls[number]) for number in range(self.numWH)]
         FleetResponse.P_service = 0
         FleetResponse.P_service_max = 0
@@ -133,7 +134,7 @@ class WaterHeaterFleet():
         FleetResponse.Q_service = 0
         FleetResponse.Q_service_max = 0
         FleetResponse.Q_forecast = 0
-        
+        Eloss = 0
         # run through fleet once as a forecast just to get initial conditions
         number = 0
         for w in whs:
@@ -178,7 +179,7 @@ class WaterHeaterFleet():
 #                    ttank, tset, soC, availableCapacityAdd, availableCapacityShed, serviceCallsAccepted, eservice, isAvailableAdd, isAvailableShed , elementon, eused, pusedmax
                     response = wh.execute(TtankLast, TsetLast, Tamb[number][step], RHamb[number][step], Tmains[number][step], draw[number][step], P_request_perWH, Type, FleetResponse.ServiceCallsAccepted[number][laststep], FleetResponse.elementOn[number][laststep], ServiceRequest.Timestep, draw_fleet_ave[min([step,ServiceRequest.Steps-1])], ServiceRequest.Forecast) #min([step,ServiceRequest.Steps-1]) is to provide a forecast for the average fleet water draw for the next timestep while basically ignoring the last timestep forecast
 
-#                assign returned parameters to associated lists to be recorded
+                #assign returned parameters to associated lists to be recorded
                 FleetResponse.Tset[number][step] = response.Tset
                 FleetResponse.Ttank[number][step] = response.Ttank
                 FleetResponse.dTtank_set [number][step] = response.Ttank - response.Tset
@@ -191,14 +192,16 @@ class WaterHeaterFleet():
                 FleetResponse.ServiceCallsAccepted[number][step] = response.ServiceCallsAccepted
                 FleetResponse.ServiceProvided[number][step] = response.Eservice
                 servsum += response.Eservice
-#                FleetResponse.TotalServiceProvidedPerWH[number] = TotalServiceProvidedPerWH[number] + ServiceProvided[number][step]
+                #FleetResponse.TotalServiceProvidedPerWH[number] = TotalServiceProvidedPerWH[number] + ServiceProvided[number][step]
+                Eloss += response.Eloss[0]
                 FleetResponse.P_injected += response.Eused
                 FleetResponse.P_injected_max += response.PusedMax
                 number += 1
 
                 
-            TotalServiceProvidedPerTimeStep[step] += servsum 
-                 
+            TotalServiceProvidedPerTimeStep[step] += servsum
+            FleetResponse.eta_charge = (FleetResponse.P_injected - Eloss)/(FleetResponse.P_injected)
+            FleetResponse.eta_discharge = ((FleetResponse.P_injected - Eloss) - Eloss)/(FleetResponse.P_injected - Eloss) #Delivered energy = 
                     
         for n in range(number):
             TotalServiceCallsAcceptedPerWH[n] = FleetResponse.ServiceCallsAccepted[n][step]
@@ -214,20 +217,30 @@ class WaterHeaterFleet():
         else:
             FleetResponse.P_forecast = 0
     
-        return FleetResponse #P_injected, Q_injected, P_service, Q_service, P_injected_max, P_service_max, Q_service_max, P_forecast, Q_forecast
+        return FleetResponse #P_injected, Q_injected, P_service, Q_service, P_injected_max, P_service_max, Q_service_max, P_forecast, Q_forecast, eta_charge, eta_discharge
     
     ###########################################################################
     
     
-def get_annual_conditions(climate_location, installation_location, days_shift,n_br,unit,timestep_min, num_steps, start_time):
+def get_annual_conditions(climate_location, installation_location, days_shift, n_br,unit, timestep_min, num_steps, start_time):
     #reads from 8760 (or 8760 * 60) input files for ambient air temp, RH, mains temp, and draw profile and loads data into arrays for future use
-    start_hr = 
     
-    num_steps_per_hr = int(np.ceil((60/timestep_min)))# how many hourly steps do you need to take if timestep is in minutes
-    num_hrs = int(np.ceil(num_steps / num_steps_per_hr ))
-    num_mins = int(np.ceil(num_steps * timestep_min ))
+    #Decompose utc timestamp to get the starting hour
+    startmonthindex = [[1,0],[2,31],[3,59],[4,90],[5,120],[6,151],[7,181],[8,212],[9,243],[10,273],[11,304],[12,334]]
+    start_month = start_time.month
+    start_day = start_time.day
+    start_hour = start_time.hour
+    for m in startmonthindex:
+        if start_month == m[0]:
+            start_day += m[1]
+            break
+    start_hr = (start_day-1) * 24. + start_hour
+    
+    num_steps_per_hr = int(np.ceil((60./float(timestep_min))))# how many hourly steps do you need to take if timestep is in minutes
+    num_hrs = int(np.ceil(float(num_steps) / float(num_steps_per_hr)))
+    num_mins = int(np.ceil(float(num_steps) * float(timestep_min )))
 #        print('num_mins',num_mins)
-    steps_per_min = int(np.ceil(1/timestep_min))
+    steps_per_min = int(np.ceil(1./float(timestep_min)))
     Tamb = []
     RHamb = []
     Tmains = []
@@ -251,9 +264,9 @@ def get_annual_conditions(climate_location, installation_location, days_shift,n_
     
     linenum = 0
     
-    ambient_cond_file = open((os.path.join(os.path.dirname(__file__),'data_files','denver_conditions.csv')),'r') #steply ambient air temperature and RH
+    ambient_cond_file = open((os.path.join(os.path.dirname(__file__),'data_files','denver_conditions.csv')),'r') #hourly ambient air temperature and RH
     for line in ambient_cond_file:
-        if linenum > start_hr and linenum <= start_hr + num_hrs: #skip header all the way to the start hour but only go as many steps as are needed
+        if linenum > start_hr and linenum <= (start_hr + num_hrs): #skip header all the way to the start hour but only go as many steps as are needed
             items = line.strip().split(',')
             for b in range(min(num_steps_per_hr,num_steps)): #repeat for however many steps there are in an hr
                 Tamb.append([float(items[amb_temp_column])])
